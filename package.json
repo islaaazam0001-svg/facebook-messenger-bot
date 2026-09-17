@@ -1,0 +1,16 @@
+{
+  "name": "facebook-messenger-gemini-bot",
+  "version": "1.0.0",
+  "description": "Bot Facebook Messenger avec reponses IA via Gemini",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "axios": "^1.7.2"
+  }
+}
