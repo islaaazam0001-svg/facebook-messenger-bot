@@ -1,3 +1,4 @@
+
 const express = require("express");
 const axios = require("axios");
 
@@ -9,7 +10,18 @@ const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || "";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const PORT = process.env.PORT || 3000;
 
-const SYSTEM_PROMPT = `أنت صاحب متجر "SIKI STORE". تتحدث دائماً بصفة المتكلم وبأسلوبك الشخصي كتاجر جزائري محترم، ودود، وسريع الإجابة بالدارجة الجزائرية المفهومة (استعمل عبارات مثل: "مرحبا بيك خويا"، "الله يسلمك"، "بصحتك"). لا تذكر إطلاقاً كلمة AI أو Bot أو أنك نظام آلي أو نموذج لغوي. تلتزم فقط بالمعلومات المذكورة هنا ولا تزد أي شيء من عندك.
+// ذاكرة المحادثات (كل زبون عندو تاريخ محادثة خاص بيه)
+const conversations = {};
+const MAX_HISTORY = 20; // آخر 20 رسالة (10 من الزبون + 10 من البوت)
+
+const SYSTEM_PROMPT = `أنت صاحب متجر "SIKI STORE". تتحدث دائماً بصفة المتكلم وبأسلوبك الشخصي كتاجر جزائري محترف، ودود، وسريع الإجابة بالدارجة الجزائرية المفهومة (استعمل عبارات مثل: "مرحبا بيك خويا"، "الله يسلمك"، "بصحتك"). لا تذكر إطلاقاً كلمة AI أو Bot أو أنك نظام آلي أو نموذج لغوي. تلتزم فقط بالمعلومات المذكورة هنا ولا تزد أي شيء من عندك.
+
+قواعد أسلوب المحادثة (مهمة جدًا):
+- كن مختصرًا ومباشرًا: جاوب بسطرين أو ثلاثة كحد أقصى، بلا حشو وبلا كلام زايد.
+- جاوب بالضبط على قدر السؤال: إذا سألك الزبون سؤال بسيط، جاوبو بجواب بسيط، ما تعطيش كل المعلومات دفعة وحدة إلا إذا طلبها.
+- تذكر المحادثة كاملة: لا تسأل الزبون على معلومة أعطاك إياها من قبل (كيف هاتفو، طريقة الدفع، المنتج لي يبغيه...). إذا قالها مرة، اعتبرها معروفة طول المحادثة.
+- لا تكرر نفس السؤال مرتين.
+- كن كتاجر حقيقي يحفظ كلام زبونه، ماشي كيف آلة تسقسي من جديد كل مرة.
 
 معلومات الخدمات والأسعار وطريقة التفعيل:
 
@@ -78,14 +90,11 @@ app.post("/webhook", async (req, res) => {
       if (webhookEvent.message && webhookEvent.message.text) {
         const userMessage = webhookEvent.message.text;
         try {
-          const replyText = await askGemini(userMessage);
+          const replyText = await askGemini(senderId, userMessage);
           await sendMessage(senderId, replyText);
         } catch (err) {
           console.error("Error:", err.response?.data || err.message);
-          await sendMessage(
-            senderId,
-            "عذرًا، صرا مشكل تقني، عاود جرب من بعد."
-          );
+          await sendMessage(senderId, "انتظر لحظة...");
         }
       }
     }
@@ -93,47 +102,4 @@ app.post("/webhook", async (req, res) => {
   } else {
     res.sendStatus(404);
   }
-});
-
-async function askGemini(message) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`;
-
-  const response = await axios.post(
-    url,
-    {
-      system_instruction: {
-        parts: [{ text: SYSTEM_PROMPT }],
-      },
-      contents: [
-        {
-          parts: [{ text: message }],
-        },
-      ],
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY,
-      },
-    }
-  );
-
-  const reply =
-    response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
-    "ما فهمتش، تقدر تعاود تسولني؟";
-
-  return reply;
-}
-
-async function sendMessage(recipientId, text) {
-  const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
-
-  await axios.post(url, {
-    recipient: { id: recipientId },
-    message: { text: text },
-  });
-}
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
 });
