@@ -9,9 +9,9 @@ const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || "";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const PORT = process.env.PORT || 3000;
 
-// ذاكرة المحادثات (كل زبون عندو تاريخ محادثة خاص بيه)
 const conversations = {};
-const MAX_HISTORY = 20; // آخر 20 رسالة (10 من الزبون + 10 من البوت)
+const MAX_HISTORY = 20;
+const MAX_RETRIES = 3;
 
 const SYSTEM_PROMPT = `أنت صاحب متجر "SIKI STORE". تتحدث دائماً بصفة المتكلم وبأسلوبك الشخصي كتاجر جزائري محترم، ودود، وسريع الإجابة بالدارجة الجزائرية المفهومة (استعمل عبارات مثل: "مرحبا بيك خويا"، "الله يسلمك"، "بصحتك"). لا تذكر إطلاقاً كلمة AI أو Bot أو أنك نظام آلي أو نموذج لغوي. تلتزم فقط بالمعلومات المذكورة هنا ولا تزد أي شيء من عندك.
 
@@ -61,6 +61,10 @@ Snapchat Plus:
 إذا سأل عن خدمة أخرى غير متوفرة (مثل سبوتيفاي أو نتفليكس): "حالياً هاد الاشتراك ماهوش متوفر عندنا خويا، نوفروا فقط Canva، Gemini، CapCut، وSnapchat Plus."
 عند الاتفاق على الشراء: تطلب منه تحديد طريقة الدفع (بريدي موب، CCP، أو فليكسي) ثم تطلب صورة الوصل أو الفليكسي والمعلومات المطلوبة (إيميل لكانفا وجيميني، أو إضافة الحساب لسناب).`;
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 app.get("/", (req, res) => {
   res.send("Facebook Messenger Bot is running ✅");
 });
@@ -88,13 +92,7 @@ app.post("/webhook", async (req, res) => {
 
       if (webhookEvent.message && webhookEvent.message.text) {
         const userMessage = webhookEvent.message.text;
-        try {
-          const replyText = await askGemini(senderId, userMessage);
-          await sendMessage(senderId, replyText);
-        } catch (err) {
-          console.error("Error:", err.response?.data || err.message);
-          await sendMessage(senderId, "انتظر لحظة...");
-        }
+        handleMessageWithRetry(senderId, userMessage);
       }
     }
     res.status(200).send("EVENT_RECEIVED");
@@ -103,6 +101,36 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+async function handleMessageWithRetry(senderId, userMessage) {
+  let attempt = 0;
+  let toldUserToWait = false;
+
+  while (attempt < MAX_RETRIES) {
+    try {
+      const replyText = await askGemini(senderId, userMessage);
+      await sendMessage(senderId, replyText);
+      return;
+    } catch (err) {
+      attempt++;
+      console.error(`Attempt ${attempt} failed:`, err.response?.data || err.message);
+
+      if (!toldUserToWait) {
+        await sendMessage(senderId, "انتظر لحظة...");
+        toldUserToWait = true;
+      }
+
+      if (attempt < MAX_RETRIES) {
+        await sleep(5000 * attempt);
+      }
+    }
+  }
+
+  await sendMessage(
+    senderId,
+    "الخدمة مزحومة بزاف دروك خويا، جرب تبعث السؤال مرة أخرى من بعد شوية."
+  );
+}
+
 async function askGemini(senderId, message) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`;
 
@@ -110,13 +138,14 @@ async function askGemini(senderId, message) {
     conversations[senderId] = [];
   }
 
-  // نزيد رسالة الزبون لتاريخ المحادثة
-  conversations[senderId].push({
-    role: "user",
-    parts: [{ text: message }],
-  });
+  const lastMsg = conversations[senderId][conversations[senderId].length - 1];
+  if (!lastMsg || lastMsg.role !== "user" || lastMsg.parts[0].text !== message) {
+    conversations[senderId].push({
+      role: "user",
+      parts: [{ text: message }],
+    });
+  }
 
-  // نحافظ غير على آخر MAX_HISTORY رسالة (باش ما يكبرش بزاف)
   if (conversations[senderId].length > MAX_HISTORY) {
     conversations[senderId] = conversations[senderId].slice(-MAX_HISTORY);
   }
@@ -141,7 +170,6 @@ async function askGemini(senderId, message) {
     response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
     "ما فهمتش، تقدر تعاود تسولني؟";
 
-  // نزيد رد البوت لتاريخ المحادثة (باش يتذكرو فالمرة الجاية)
   conversations[senderId].push({
     role: "model",
     parts: [{ text: reply }],
