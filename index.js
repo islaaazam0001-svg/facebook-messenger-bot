@@ -1,4 +1,3 @@
-
 const express = require("express");
 const axios = require("axios");
 
@@ -14,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 const conversations = {};
 const MAX_HISTORY = 20; // آخر 20 رسالة (10 من الزبون + 10 من البوت)
 
-const SYSTEM_PROMPT = `أنت صاحب متجر "SIKI STORE". تتحدث دائماً بصفة المتكلم وبأسلوبك الشخصي كتاجر جزائري محترف، ودود، وسريع الإجابة بالدارجة الجزائرية المفهومة (استعمل عبارات مثل: "مرحبا بيك خويا"، "الله يسلمك"، "بصحتك"). لا تذكر إطلاقاً كلمة AI أو Bot أو أنك نظام آلي أو نموذج لغوي. تلتزم فقط بالمعلومات المذكورة هنا ولا تزد أي شيء من عندك.
+const SYSTEM_PROMPT = `أنت صاحب متجر "SIKI STORE". تتحدث دائماً بصفة المتكلم وبأسلوبك الشخصي كتاجر جزائري محترم، ودود، وسريع الإجابة بالدارجة الجزائرية المفهومة (استعمل عبارات مثل: "مرحبا بيك خويا"، "الله يسلمك"، "بصحتك"). لا تذكر إطلاقاً كلمة AI أو Bot أو أنك نظام آلي أو نموذج لغوي. تلتزم فقط بالمعلومات المذكورة هنا ولا تزد أي شيء من عندك.
 
 قواعد أسلوب المحادثة (مهمة جدًا):
 - كن مختصرًا ومباشرًا: جاوب بسطرين أو ثلاثة كحد أقصى، بلا حشو وبلا كلام زايد.
@@ -102,4 +101,64 @@ app.post("/webhook", async (req, res) => {
   } else {
     res.sendStatus(404);
   }
+});
+
+async function askGemini(senderId, message) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`;
+
+  if (!conversations[senderId]) {
+    conversations[senderId] = [];
+  }
+
+  // نزيد رسالة الزبون لتاريخ المحادثة
+  conversations[senderId].push({
+    role: "user",
+    parts: [{ text: message }],
+  });
+
+  // نحافظ غير على آخر MAX_HISTORY رسالة (باش ما يكبرش بزاف)
+  if (conversations[senderId].length > MAX_HISTORY) {
+    conversations[senderId] = conversations[senderId].slice(-MAX_HISTORY);
+  }
+
+  const response = await axios.post(
+    url,
+    {
+      system_instruction: {
+        parts: [{ text: SYSTEM_PROMPT }],
+      },
+      contents: conversations[senderId],
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY,
+      },
+    }
+  );
+
+  const reply =
+    response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
+    "ما فهمتش، تقدر تعاود تسولني؟";
+
+  // نزيد رد البوت لتاريخ المحادثة (باش يتذكرو فالمرة الجاية)
+  conversations[senderId].push({
+    role: "model",
+    parts: [{ text: reply }],
+  });
+
+  return reply;
+}
+
+async function sendMessage(recipientId, text) {
+  const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+
+  await axios.post(url, {
+    recipient: { id: recipientId },
+    message: { text: text },
+  });
+}
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
