@@ -180,7 +180,7 @@ async function askOpenRouter(senderId, message) {
   const response = await axios.post(
     url,
     {
-      model: "anthropic/claude-3.5-haiku", // موديل سريع ورخيص ويفهم الدارجة مليح
+      model: "anthropic/claude-4.5-haiku", // موديل سريع ورخيص ويفهم الدارجة مليح
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         ...conversations[senderId],
