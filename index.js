@@ -1,192 +1,392 @@
-const express = require("express");
+Const express = require("express");
+
 const axios = require("axios");
 
+
+
 const app = express();
+
 app.use(express.json());
 
+
+
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "monTokenSecret123";
+
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || "";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+
 const PORT = process.env.PORT || 3000;
 
+
+
 const conversations = {};
+
 const MAX_HISTORY = 20;
+
 const MAX_RETRIES = 3;
+
+
 
 const SYSTEM_PROMPT = `أنت صاحب متجر "SIKI STORE". تتحدث دائماً بصفة المتكلم وبأسلوبك الشخصي كتاجر جزائري محترم، ودود، وسريع الإجابة بالدارجة الجزائرية المفهومة (استعمل عبارات مثل: "مرحبا بيك خويا"، "الله يسلمك"، "بصحتك"). لا تذكر إطلاقاً كلمة AI أو Bot أو أنك نظام آلي أو نموذج لغوي. تلتزم فقط بالمعلومات المذكورة هنا ولا تزد أي شيء من عندك.
 
+
+
 قواعد أسلوب المحادثة (مهمة جدًا):
+
 - كن مختصرًا ومباشرًا: جاوب بسطرين أو ثلاثة كحد أقصى، بلا حشو وبلا كلام زايد.
+
 - جاوب بالضبط على قدر السؤال: إذا سألك الزبون سؤال بسيط، جاوبو بجواب بسيط، ما تعطيش كل المعلومات دفعة وحدة إلا إذا طلبها.
+
 - تذكر المحادثة كاملة: لا تسأل الزبون على معلومة أعطاك إياها من قبل (كيف هاتفو، طريقة الدفع، المنتج لي يبغيه...). إذا قالها مرة، اعتبرها معروفة طول المحادثة.
+
 - لا تكرر نفس السؤال مرتين.
+
 - كن كتاجر حقيقي يحفظ كلام زبونه، ماشي كيف آلة تسقسي من جديد كل مرة.
+
+
 
 معلومات الخدمات والأسعار وطريقة التفعيل:
 
+
+
 Canva Pro:
+
 السعر والمدة: 3 سنوات بـ 500 دج.
+
 التفعيل: رسمي وشخصي عبر إرسال دعوة (Invitation) إلى إيميل الزبون الخاص، يقبلها وتتفتح في حسابه مباشرة، وتصاميمه القديمة كاملة تبقى وما يروح والو.
 
+
+
 Gemini Pro:
+
 السعر والمدة: 18 شهر بـ 1000 دج.
+
 التفعيل: رسمي وشخصي عبر دعوة (Invitation) إلى إيميل الزبون، يقبل الدعوة وتتفعل في حسابه. يخدم بإيميلو الشخصي وبلا VPN.
 
+
+
 CapCut Pro:
+
 السعر والمدة: شهر واحد بـ 1000 دج.
+
 التفعيل: حساب جاهز من عندنا (نعطيك إيميل وكلمة السر جاهزين). يخدم في الهاتف والكمبيوتر.
 
+
+
 Snapchat Plus:
+
 التفعيل كامل وبكل أنواعه يكون بدون كلمة السر (المودباس) إطلاقاً.
+
 اشتراك 3 أشهر: 1500 دج (طريقة التفعيل: الزبون يضيف حساب المتجر في سنابشات فقط ويتم التفعيل).
+
 اشتراك 6 أشهر: 2200 دج (طريقة التفعيل: الزبون يضيف حساب المتجر في سنابشات فقط ويتم التفعيل).
+
 اشتراك سنة كاملة (12 شهر):
+
 تسأل الزبون أولاً: "واش من هاتف عندك (iPhone ولا Android)؟"
+
 إذا كان iPhone: السعر 2700 دج. (تخبره: التفعيل يتطلب تبديل الريجيون في الآب ستور إلى الهند، إذا تعرف تبدلها نفعلولك، وإذا ما تعرفش نعطولك الطريقة خطوة بخطوة).
+
 إذا كان Android: السعر 4000 دج.
 
+
+
 طرق الدفع وقاعدة الفليكسي:
+
 بريدي موب (BaridiMob) و CCP: بنفس الأسعار المذكورة أعلاه.
+
 فليكسي (Flexy): تزيد نسبة 20%+ على السعر الأصلي (تحسب الزيادة للزبون مباشرة وتمدلو السعر النهائي: كانفا 600 دج، جيميني 1200 دج، كاب كات 1200 دج، سناب 3 أشهر 1800 دج... إلخ).
 
+
+
 أجوبة محددة لأسئلة الزبائن:
+
 "واش يضمنلي بلي ما تسرقنيش؟": "خويا لعزيز حنا نخدمو بالحلال وسمعتنا هي راس مالنا، تقدر تشوف آراء وتقييمات الزبائن في الصفحة، ونمشيو معاك خطوة بخطوة حتى تتأكد من خدمتك."
+
 "أعطيني رقم الهاتف نتصل بيك": "التواصل والخدمة كامل هنا عبر مسنجر الصفحة لتوثيق الطلبات، تفضل قولي واش محتاج وراني معاك نجاوبك فورا."
+
 "هل يطلب كلمة السر تاع سنابشات؟": "لا لا خويا لعزيز أبداً! التفعيل كامل بدون كلمة السر، خصوصيتك وتصاورك في أمان 100%."
+
 "هل كاين ضمان؟": "نعم كاين ضمان كامل طيلة مدة الاشتراك."
+
 مدة التسليم: "مباشرة بعد ما تبعثلي صورة الوصل (Reçu) أو رسالة الفليكسي، من 5 إلى 15 دقيقة ماكسيموم تكون خدمتك واجدة ومفعلة."
 
+
+
 قواعد صارمة:
+
 التقييد التام بالمتجر: ممنوع الإجابة على أي موضوع خارج هذه الخدمات الأربعة، وممنوع إعطاء طرق العمل (Méthode) أو قبول الدفع بعد التفعيل (الدين).
+
 إذا سأل عن خدمة أخرى غير متوفرة (مثل سبوتيفاي أو نتفليكس): "حالياً هاد الاشتراك ماهوش متوفر عندنا خويا، نوفروا فقط Canva، Gemini، CapCut، وSnapchat Plus."
+
 عند الاتفاق على الشراء: تطلب منه تحديد طريقة الدفع (بريدي موب، CCP، أو فليكسي) ثم تطلب صورة الوصل أو الفليكسي والمعلومات المطلوبة (إيميل لكانفا وجيميني، أو إضافة الحساب لسناب).`;
 
+
+
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+
+return new Promise((resolve) => setTimeout(resolve, ms));
+
 }
+
+
 
 app.get("/", (req, res) => {
-  res.send("Facebook Messenger Bot is running ✅");
+
+res.send("Facebook Messenger Bot is running ✅");
+
 });
+
+
 
 app.get("/webhook", (req, res) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
 
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("✅ Webhook verified");
-    res.status(200).send(challenge);
-  } else {
-    res.sendStatus(403);
-  }
+const mode = req.query["hub.mode"];
+
+const token = req.query["hub.verify_token"];
+
+const challenge = req.query["hub.challenge"];
+
+
+
+if (mode === "subscribe" && token === VERIFY_TOKEN) {
+
+console.log("✅ Webhook verified");
+
+res.status(200).send(challenge);
+
+} else {
+
+res.sendStatus(403);
+
+}
+
 });
+
+
 
 app.post("/webhook", async (req, res) => {
-  const body = req.body;
 
-  if (body.object === "page") {
-    for (const entry of body.entry) {
-      const webhookEvent = entry.messaging[0];
-      const senderId = webhookEvent.sender.id;
+const body = req.body;
 
-      if (webhookEvent.message && webhookEvent.message.text) {
-        const userMessage = webhookEvent.message.text;
-        handleMessageWithRetry(senderId, userMessage);
-      }
-    }
-    res.status(200).send("EVENT_RECEIVED");
-  } else {
-    res.sendStatus(404);
-  }
+
+
+if (body.object === "page") {
+
+for (const entry of body.entry) {
+
+const webhookEvent = entry.messaging[0];
+
+const senderId = webhookEvent.sender.id;
+
+
+
+if (webhookEvent.message && webhookEvent.message.text) {
+
+const userMessage = webhookEvent.message.text;
+
+handleMessageWithRetry(senderId, userMessage);
+
+}
+
+}
+
+res.status(200).send("EVENT_RECEIVED");
+
+} else {
+
+res.sendStatus(404);
+
+}
+
 });
+
+
 
 async function handleMessageWithRetry(senderId, userMessage) {
-  let attempt = 0;
-  let toldUserToWait = false;
 
-  while (attempt < MAX_RETRIES) {
-    try {
-      const replyText = await askGemini(senderId, userMessage);
-      await sendMessage(senderId, replyText);
-      return;
-    } catch (err) {
-      attempt++;
-      console.error(`Attempt ${attempt} failed:`, err.response?.data || err.message);
+let attempt = 0;
 
-      if (!toldUserToWait) {
-        await sendMessage(senderId, "انتظر لحظة...");
-        toldUserToWait = true;
-      }
+let toldUserToWait = false;
 
-      if (attempt < MAX_RETRIES) {
-        await sleep(5000 * attempt);
-      }
-    }
-  }
 
-  await sendMessage(
-    senderId,
-    "الخدمة مزحومة بزاف دروك خويا، جرب تبعث السؤال مرة أخرى من بعد شوية."
-  );
+
+while (attempt < MAX_RETRIES) {
+
+try {
+
+const replyText = await askOpenRouter(senderId, userMessage);
+
+await sendMessage(senderId, replyText);
+
+return;
+
+} catch (err) {
+
+attempt++;
+
+console.error(`Attempt ${attempt} failed:`, err.response?.data || err.message);
+
+
+
+if (!toldUserToWait) {
+
+await sendMessage(senderId, "انتظر لحظة...");
+
+toldUserToWait = true;
+
 }
 
-async function askGemini(senderId, message) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`;
 
-  if (!conversations[senderId]) {
-    conversations[senderId] = [];
-  }
 
-  const lastMsg = conversations[senderId][conversations[senderId].length - 1];
-  if (!lastMsg || lastMsg.role !== "user" || lastMsg.parts[0].text !== message) {
-    conversations[senderId].push({
-      role: "user",
-      parts: [{ text: message }],
-    });
-  }
+if (attempt < MAX_RETRIES) {
 
-  if (conversations[senderId].length > MAX_HISTORY) {
-    conversations[senderId] = conversations[senderId].slice(-MAX_HISTORY);
-  }
+await sleep(5000 * attempt);
 
-  const response = await axios.post(
-    url,
-    {
-      system_instruction: {
-        parts: [{ text: SYSTEM_PROMPT }],
-      },
-      contents: conversations[senderId],
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY,
-      },
-    }
-  );
-
-  const reply =
-    response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
-    "ما فهمتش، تقدر تعاود تسولني؟";
-
-  conversations[senderId].push({
-    role: "model",
-    parts: [{ text: reply }],
-  });
-
-  return reply;
 }
+
+}
+
+}
+
+
+
+await sendMessage(
+
+senderId,
+
+"الخدمة مزحومة بزاف دروك خويا، جرب تبعث السؤال مرة أخرى من بعد شوية."
+
+);
+
+}
+
+
+
+// ==== الدالة الجديدة: OpenRouter بدل Gemini ====
+
+async function askOpenRouter(senderId, message) {
+
+const url = "https://openrouter.ai/api/v1/chat/completions";
+
+
+
+if (!conversations[senderId]) {
+
+conversations[senderId] = [];
+
+}
+
+
+
+// تفادي تكرار نفس الرسالة إذا توصلات مرتين
+
+const lastMsg = conversations[senderId][conversations[senderId].length - 1];
+
+if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== message) {
+
+conversations[senderId].push({
+
+role: "user",
+
+content: message,
+
+});
+
+}
+
+
+
+if (conversations[senderId].length > MAX_HISTORY) {
+
+conversations[senderId] = conversations[senderId].slice(-MAX_HISTORY);
+
+}
+
+
+
+const response = await axios.post(
+
+url,
+
+{
+
+model: "anthropic/claude-haiku-4.5", // يقدر يتبدل لأي موديل آخر (gemini، gpt...)
+
+messages: [
+
+{ role: "system", content: SYSTEM_PROMPT },
+
+...conversations[senderId],
+
+],
+
+max_tokens: 400,
+
+},
+
+{
+
+headers: {
+
+Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+
+"Content-Type": "application/json",
+
+},
+
+}
+
+);
+
+
+
+const reply =
+
+response.data.choices?.[0]?.message?.content ||
+
+"ما فهمتش، تقدر تعاود تسولني؟";
+
+
+
+conversations[senderId].push({
+
+role: "assistant",
+
+content: reply,
+
+});
+
+
+
+return reply;
+
+}
+
+
 
 async function sendMessage(recipientId, text) {
-  const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
 
-  await axios.post(url, {
-    recipient: { id: recipientId },
-    message: { text: text },
-  });
+const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+
+
+
+await axios.post(url, {
+
+recipient: { id: recipientId },
+
+message: { text: text },
+
+});
+
 }
 
+
+
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+
+console.log(`🚀 Server running on port ${PORT}`);
+
+}); 
+
