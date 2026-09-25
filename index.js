@@ -112,7 +112,7 @@ async function handleMessageWithRetry(senderId, userMessage) {
       return;
     } catch (err) {
       attempt++;
-      console.error(Attempt ${attempt} failed:, err.response?.data || err.message);
+      console.error("Attempt " + attempt + " failed:", err.response?.data || err.message);
 
       if (!toldUserToWait) {
         await sendMessage(senderId, "انتظر لحظة...");
@@ -162,7 +162,7 @@ async function askOpenRouter(senderId, message) {
     },
     {
       headers: {
-        Authorization: Bearer ${OPENROUTER_API_KEY},
+        Authorization: "Bearer " + OPENROUTER_API_KEY,
         "Content-Type": "application/json",
       },
     }
@@ -181,7 +181,7 @@ async function askOpenRouter(senderId, message) {
 }
 
 async function sendMessage(recipientId, text) {
-  const url = https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN};
+  const url = "https://graph.facebook.com/v21.0/me/messages?access_token=" + PAGE_ACCESS_TOKEN;
 
   await axios.post(url, {
     recipient: { id: recipientId },
@@ -190,5 +190,5 @@ async function sendMessage(recipientId, text) {
 }
 
 app.listen(PORT, () => {
-  console.log(🚀 Server running on port ${PORT});
+  console.log("🚀 Server running on port " + PORT);
 });
