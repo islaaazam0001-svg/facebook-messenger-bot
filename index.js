@@ -189,6 +189,16 @@ async function sendMessage(recipientId, text) {
   });
 }
 
+// ==== Self-ping باش السيرفر مايرقدش (Render Free) ====
+const SELF_URL = "https://facebook-messenger-bot-s8bp.onrender.com";
+
+setInterval(() => {
+  axios
+    .get(SELF_URL)
+    .then(() => console.log("🔄 Self-ping OK"))
+    .catch((err) => console.log("⚠️ Self-ping failed:", err.message));
+}, 14 * 60 * 1000);
+
 app.listen(PORT, () => {
   console.log("🚀 Server running on port " + PORT);
 });
