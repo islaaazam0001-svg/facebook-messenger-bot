@@ -101,11 +101,11 @@ const SYSTEM_PROMPT = `أنت هو مول محل "SIKI STORE". تهدر ديما
 
 تفاصيل السلع والتفعيل:
 Canva Pro: 3 سنين بـ 500 دج (دعوة فـ الإيميل وتصاميمك يبقاو).
-Gemini Pro: 18 شهر بـ 1000 دج (نرسلولك رابط تفعيل فـ الإيمايل الشخصي تاعك وتخدم بيه عادي بلا VPN).
+Gemini Pro: 18 شهر بـ 1000 دج (نرسلولك رابط تفعيل فـ الإيمايل الشخصي تاعك وتخدم بيه عادي بلا VPN وممنوع تقول نرسلك دعوة).
 CapCut Pro: شهر بـ 1000 دج.
 صيغة الرد إذا سقسى على CapCut Pro:
 "CapCut Pro شهر واحد بـ 1000 دج خويا/أختي.
-نعطيوك حساب واجد (إيميل ومودباس) تفعلو فالتطبيق فالتليفون، وباش تخدم بيه فالحاسوب نديرولك مسح Code QR. واش راك حاب تفعلو؟"
+نعطيوك حساب واجد (إيميل ومودباس) تفعلو فالتطبيق فالتليفون، وباش تخدم بيه فالحاسوب نديرولك مسح Code QR بشرط ما تبدلش المودباس. واش راك حاب تفعلو؟"
 
 Snapchat Plus: بلا مودباس نهائياً.
 - 3 أشهر: 1500 دج / 6 أشهر: 2200 دج.
@@ -255,12 +255,12 @@ async function askOpenRouter(senderId, message) {
   const response = await axios.post(
     url,
     {
-      model: "anthropic/claude-3.5-sonnet",
+      model: "anthropic/claude-haiku-4.5",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         ...conversations[senderId],
       ],
-      max_tokens: 250,
+      max_tokens: 400,
     },
     {
       headers: {
