@@ -10,6 +10,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const PORT = process.env.PORT || 3000;
 
 const conversations = {};
+const userProfiles = {}; // لتخزين اسم الزبون
 const MAX_HISTORY = 20;
 const MAX_RETRIES = 3;
 
@@ -55,7 +56,23 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-// ==== نظام تجميع الرسائل المتتالية (Debounce) لمنع الرد المزدوج ====
+// ==== جلب اسم الزبون من فيسبوك ====
+async function getUserName(senderId) {
+  if (userProfiles[senderId]) return userProfiles[senderId];
+  try {
+    const url = `https://graph.facebook.com/v21.0/${senderId}?fields=first_name&access_token=${PAGE_ACCESS_TOKEN}`;
+    const res = await axios.get(url);
+    if (res.data && res.data.first_name) {
+      userProfiles[senderId] = res.data.first_name;
+      return res.data.first_name;
+    }
+  } catch (err) {
+    // إذا لم تتوفر الصلاحية
+  }
+  return null;
+}
+
+// ==== نظام تجميع الرسائل المتتالية (Debounce) ====
 const userBuffers = new Map();
 
 function handleUserMessageBuffered(senderId, text) {
@@ -87,24 +104,29 @@ function cleanMarkdown(text) {
 }
 
 const SYSTEM_PROMPT = `أنت هو بائع في متجر "SIKI STORE".
-ممنوع نهائياً، قطعياً وتحت أي ظرف، أن تخترع معلومة، أو مدة، أو سعر، أو حسابات رياضية من عندك. التزم حصرياً بالنصوص التالية بالحرف الواحد:
+ممنوع نهائياً أن تخترع معلومة، أو مدة، أو سعر من عندك. التزم حصرياً بالنصوص التالية بالحرف الواحد:
+
+قاعدة التعامل حسب الجنس (مهم جداً):
+- ستصلك معلومة عن اسم الزبون.
+- إذا كان الاسم لأنثى أو تحدثت بصيغة المؤنث: خاطبها بصيغة المؤنث حصراً وقل: "أختي" (ممنوع منعاً باتاً كتابة خويا/أختي بشرطة).
+- إذا كان الاسم لذكر أو غير واضح: خاطبه بـ "خويا".
 
 قواعد الإلزام الصارمة:
 1. الإجابة تكون فقط في سطر واحد، أو سطرين على الأكثر.
 2. لا تكرر الأسئلة ولا تلح على الزبون.
 3. إذا قال الزبون كلمة ختامية (اك، اوك، ok، شكرا، صحا، يعطيك الصحة، ميرسي):
-الرد الإلزامي: "بلا جميل خويا/أختي، مرحبا بك في أي وقت." وممنوع كتابة أي كلمة بعدها.
+الرد الإلزامي: "بلا جميل خويا، مرحبا بك في أي وقت." (أو "بلا جميل أختي، مرحبا بك في أي وقت."). ممنوع كتابة أي كلمة بعدها.
 4. إذا طلب الزبون تخفيض السعر أو اشتكى (غالي، بزاف، نقصلي):
-الرد الإلزامي: "هادو هما الأسعار خويا، والخدمة مضمونة ورسمية."
-5. إذا طلب الزبون مدة غير مذكورة إطلاقاً (مثل: شهرين كانفا، شهرين كابكات، سنتين سناب... إلخ):
-الرد الإلزامي: "نوفروا غير المدد المذكورة خويا." بدون أي اقتراح آخر ولا حساب أسعار.
-6. أي سؤال خارج القائمة المحددة أو تفاوض أو استفسار لا تعرف جوابه المكتوب هنا:
-الرد الإلزامي: "دقيقة برك خويا، يدخل الأدمن ويجاوبك على كلش بالتفصيل."
+الرد الإلزامي: "هادو هما الأسعار، والخدمة مضمونة ورسمية."
+5. إذا طلب الزبون مدة غير مذكورة إطلاقاً:
+الرد الإلزامي: "نوفروا غير المدد المذكورة." بدون أي اقتراح آخر ولا حساب أسعار.
+6. أي سؤال خارج القائمة المحددة أو تفاوض لا تعرف جوابه المكتوب هنا:
+الرد الإلزامي: "دقيقة برك، يدخل الأدمن ويجاوبك على كلش بالتفصيل."
 
 النصوص الحرفية المعتمدة:
 
-1. التحية والنداء (سلام، اخي، خويا، كاين، مسا الخير):
-"وعليكم السلام خويا/أختي، مرحبا بك. واش راك حاب تفعّل؟"
+1. التحية والنداء (سلام، كاين، مسا الخير):
+"وعليكم السلام، مرحبا بك. واش راك حاب تفعّل؟" (للمؤنث: "واش راك حابة تفعّلي؟").
 
 2. CANVA PRO:
 - السعر: "كانفا برو ب 500 دج لمدة ثلاث سنوات"
@@ -115,7 +137,7 @@ const SYSTEM_PROMPT = `أنت هو بائع في متجر "SIKI STORE".
 - التفعيل (إذا سأل فقط): "نعطيلك رابط تفعيل ف حسابك الشخصي"
 
 4. CAPCUT PRO:
-- السعر: "CapCut Pro شهر واحد بـ 1000 دج خويا."
+- السعر: "CapCut Pro شهر واحد بـ 1000 دج."
 - التفعيل أو سؤال الحاسوب (إذا سأل فقط): "يمشي فالتطبيق فالتليفون و يمشي فالحاسوب، نعطولك إيمايل و كلمة السر."
 - إذا قال في حسابي الشخصي: "نعطولك ايمايل و كلمة السر ."
 
@@ -141,14 +163,14 @@ SNAPCHAT PLUS
 عام ب 4000 دج لاصحاب الاندرويد
 
 7. الضمان:
-"عندك ضمان كامل المدة اخي ، اي مشكل راسلنا"
+"عندك ضمان كامل المدة، اي مشكل راسلنا"
 
 8. الدفع والأدمن:
 - ممنوع كتابة أي رقم حساب إطلاقاً.
-- إذا قرر الشراء أو سأل عن الحساب: "تفضل خويا/أختي، اصبر عليا شوية يدخل الأدمن يعطيك معلومات الحساب باش تبعت، والتفعيل يكون سريعا بعد ما تبعتلنا الوصل."
+- إذا قرر الشراء: "اصبر عليا شوية يدخل الأدمن يعطيك معلومات الحساب باش تبعت، والتفعيل يكون سريعا بعد ما تبعتلنا الوصل."
 
-9. المنتجات غير المتوفرة (نتفليكس، سبوتيفاي... إلخ):
-"حالياً نوفروا غير: Canva، Gemini، CapCut، وSnapchat Plus خويا."`;
+9. المنتجات غير المتوفرة:
+"حالياً نوفروا غير: Canva، Gemini، CapCut، وSnapchat Plus."`;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -246,7 +268,7 @@ async function handleMessageWithRetry(senderId, userMessage) {
       console.error(`Attempt ${attempt} failed:`, err.response?.data || err.message);
 
       if (!toldUserToWait) {
-        await sendMessage(senderId, "دقيقة برك خويا راني نشوفلك...");
+        await sendMessage(senderId, "دقيقة برك راني نشوفلك...");
         toldUserToWait = true;
       }
 
@@ -258,7 +280,7 @@ async function handleMessageWithRetry(senderId, userMessage) {
 
   await sendMessage(
     senderId,
-    "كاين ضغط شوية دك خويا، عاود ابعثلي ميساج بعد لحظات ونجاوبك فورا."
+    "كاين ضغط شوية دك، عاود ابعثلي ميساج بعد لحظات ونجاوبك فورا."
   );
 }
 
@@ -268,6 +290,11 @@ async function askOpenRouter(senderId, message) {
   if (!conversations[senderId]) {
     conversations[senderId] = [];
   }
+
+  const customerName = await getUserName(senderId);
+  const promptWithContext = customerName 
+    ? `${SYSTEM_PROMPT}\n\nمعلومة إضافية: اسم الزبون الحالي هو: "${customerName}". خاطبه بناءً على جنس هذا الاسم (إذا كان أنثى قل أختي، إذا كان ذكر قل خويا).`
+    : SYSTEM_PROMPT;
 
   const lastMsg = conversations[senderId][conversations[senderId].length - 1];
   if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== message) {
@@ -285,9 +312,9 @@ async function askOpenRouter(senderId, message) {
     url,
     {
       model: "anthropic/claude-haiku-4.5",
-      temperature: 0, // يمنع الاجتهاد والتأليف نهائياً
+      temperature: 0,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: promptWithContext },
         ...conversations[senderId],
       ],
       max_tokens: 300,
@@ -303,7 +330,7 @@ async function askOpenRouter(senderId, message) {
 
   const reply =
     response.data.choices?.[0]?.message?.content ||
-    "دقيقة برك خويا، يدخل الأدمن ويجاوبك على كلش بالتفصيل.";
+    "دقيقة برك، يدخل الأدمن ويجاوبك على كلش بالتفصيل.";
 
   conversations[senderId].push({
     role: "assistant",
@@ -325,7 +352,7 @@ async function sendMessage(recipientId, text) {
   rememberBotMessage(mid);
 }
 
-// ==== Self-ping لمنع نوم السيرفر فـ Render ====
+// ==== Self-ping ====
 const SELF_URL = "https://facebook-messenger-bot-s8bp.onrender.com";
 
 setInterval(() => {
