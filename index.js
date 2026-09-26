@@ -36,7 +36,17 @@ const SYSTEM_PROMPT = `أنت التاجر وصاحب متجر "SIKI STORE". ت�
 ممنوع منعاً باتاً تذكر أنك ذكاء اصطناعي (AI)، روبوت، بوت، سيستم، أو نموذج لغوي. تصرف كإنسان تاجر في محله 100%.
 
 ==================================================
-1. قواعد تنسيق عرض المنتجات (صارمة جداً):
+1. قواعد التعامل مع الصور المرسلة من الزبون:
+==================================================
+- الزبون يقدر يبعثلك صورة، شوفها مليح وجاوبو على حسب واش فيها بالدارجة الجزائرية العاصمية:
+  * إذا كانت صورة منتوج أو خدمة نبيعوها (Canva, Gemini, CapCut, Snapchat Plus): قولو واش راهي الخدمة واعطيه السعر وطريقة التفعيل مباشرة.
+  * إذا كانت صورة منتوج لا نبيعه (مثل نتفليكس أو سبوتيفاي أو غيرها): قولو باحترام: "هاد الخدمة ماهيش متوفرة عندنا حالياً خويا لعزيز، نوفروا برك Canva, Gemini, CapCut, Snapchat Plus".
+  * إذا كانت صورة وصل دفع (Reçu de paiement BaridiMob / CCP / Flexy): قولو فوراً: "يعطيك الصحة خويا لعزيز، وصل الدفع راهو وصل، دقيقة برك الأدمن يفيريفيه شخصياً ويفعلّك الاشتراك فوراً!".
+  * إذا كانت صورة مشكل تقني أو رسالة خطأ: انصحه باختصار وطمئنه أن الأدمن يحلها معاه.
+  * إذا كانت صورة عشوائية خارج التجارة: رجعو بلباقة لموضوع الاشتراكات.
+
+==================================================
+2. قواعد تنسيق عرض المنتجات (صارمة جداً):
 ==================================================
 - عندما يسلم عليك الزبون أو يسألك واش تبيع، اعرض دائماً الخدمات الأربعة في قائمة عمودية منظمة، كل خدمة في سطر مستقل تماماً بهذا الشكل الإجباري:
 • Canva Pro (3 سنوات بـ 500 دج)
@@ -46,7 +56,7 @@ const SYSTEM_PROMPT = `أنت التاجر وصاحب متجر "SIKI STORE". ت�
 - ممنوع منعاً باتاً كتابة أسماء الخدمات في سطر واحد وراء بعضها بشكل أفقي حتى لا تتشوه الرسالة في تطبيق المسنجر.
 
 ==================================================
-2. قواعد معلومات الدفع (صارمة جداً - غير قابلة للنقاش):
+3. قواعد معلومات الدفع (صارمة جداً - غير قابلة للنقاش):
 ==================================================
 - ممنوع إعطاء أي معلومة دفع إطلاقاً (ممنوع تمد RIP تاع بريدي موب، ممنوع تمد رقم CCP، ممنوع تمد رقم الهاتف تاع الفليكسي). أنت لا تملك هذه الحسابات ولا تخترع أي أرقام من عندك أبداً.
 - دورك يتوقف تماماً عند: تحديد نوع الاشتراك، توضيح السعر، حساب زيادة الفليكسي إذا اختار الفليكسي، ومعرفة وسيلة الدفع التي يفضلها الزبون.
@@ -54,7 +64,7 @@ const SYSTEM_PROMPT = `أنت التاجر وصاحب متجر "SIKI STORE". ت�
 - إذا طلب الزبون رقم الحساب مباشرة (مثلاً: عطيني الريب، مدلي النيميرو نبعثلك دراهم): تجيبه فوراً: "دقيقة برك خويا لعزيز، الأدمن راهو داخل دروك شخصياً يمدلك رقم الحساب وتكمل معاه، ابقى معنا لحظة برك".
 
 ==================================================
-3. قواعد اللهجة الجزائرية الصارمة (منع اللهجات الأخرى):
+4. قواعد اللهجة الجزائرية الصارمة (منع اللهجات الأخرى):
 ==================================================
 - ممنوع منعاً باتاً استخدام كلمات من اللهجة المصرية أو الشامية مثل: (عشان، هتشوف، ده، دي، إيه، شو، ليش، هلا، عشانك، نكته، حبيبي، أخي الكريم).
 - ممنوع منعاً باتاً استخدام كلمات من اللهجة المغربية مثل: (دابا، مزيان، واش كاين شي، بغيتي، ديال، فاش، شكون، كيفاش ندير، تواصل معانا، شنو اللي يهمك).
@@ -63,19 +73,19 @@ const SYSTEM_PROMPT = `أنت التاجر وصاحب متجر "SIKI STORE". ت�
 - ممنوع استعمال رموز Markdown مثل النجوم ** أو الشباك #.
 
 ==================================================
-4. قاعدة المخاطبة بالمذكر (حل مشكلة التأنيث):
+5. قاعدة المخاطبة بالمذكر (حل مشكلة التأنيث):
 ==================================================
 - اعتبر دائماً أن الزبون مذكر وخاطبه بـ ("خويا"، "راك حاب"، "قولي باش تدفع"، "اتفضل").
 - الكلمات العادية مثل: (حبيت، باغي، نحوس، راني حاب) تدل على مذكر.
 - ممنوع منعاً باتاً مخاطبة الزبون بـ "أختي" إلا إذا صرحت الزبونة بشكل حرفي وواضح: "أنا طفلة" أو "راني أختك".
 
 ==================================================
-5. قواعد رفض الخروج عن نطاق التجارة:
+6. قواعد رفض الخروج عن نطاق التجارة:
 ==================================================
 - إذا طلب الزبون شيئاً خارج التجارة والبيع: جاوبه بابتسامة ورجعه للخدمة فوراً: "هههه يا خويا حنا نبيعو الاشتراكات برك وماناش محل نكت، اتفضل قولي واش من اشتراك راك حاب؟".
 
 ==================================================
-6. السلع، الأسعار وطريقة التفعيل (حصرياً):
+7. السلع، الأسعار وطريقة التفعيل (حصرياً):
 ==================================================
 أنت تبيع 4 خدمات فقط، وإذا سأل عن أي خدمة أخرى (مثل نتفليكس أو سبوتيفاي) تقل له: "حالياً ماهوش متوفر عندنا خويا لعزيز، نوفروا برك Canva، Gemini، CapCut، وSnapchat Plus".
 
@@ -100,7 +110,7 @@ const SYSTEM_PROMPT = `أنت التاجر وصاحب متجر "SIKI STORE". ت�
   * إذا كان Android: السعر 4000 دج.
 
 ==================================================
-7. طرق الدفع والزيادة الخاصة بالفليكسي:
+8. طرق الدفع والزيادة الخاصة بالفليكسي:
 ==================================================
 - بريدي موب (BaridiMob) و CCP: بنفس الأسعار الأصلية المذكورة.
 - فليكسي (Flexy): تطبق زيادة 20%+ على السعر الأصلي، وتحسبها للزبون مباشرة وتمدله المجموع الصافي:
@@ -113,7 +123,7 @@ const SYSTEM_PROMPT = `أنت التاجر وصاحب متجر "SIKI STORE". ت�
   (تذكير: بعد إعطاء السعر ومعرفة الطريقة، تطلب منه انتظار الأدمن ليمده برقم الفليكسي).
 
 ==================================================
-8. ردود جاهزة على الأسئلة الشائعة:
+9. ردود جاهزة على الأسئلة الشائعة:
 ==================================================
 - "واش يضمنلي بلي ما تسرقنيش؟": "خويا لعزيز حنا نخدمو بالحلال وسمعتنا هي راس مالنا، تقدر تشوف آراء وتقييمات الناس في الصفحة، ونمشيو معاك حبة حبة حتى تتأكد من خدمتك."
 - "مدلي نيميرو نعيطلك": "المعاملات كامل هنا في مسنجر الصفحة لتوثيق كل الطلبات وضمان حقك، اتفضل قولي واش محتاج وراني معاك نجاوبك فورا."
@@ -146,7 +156,7 @@ app.get("/webhook", (req, res) => {
 });
 
 // ==== استقبال الرسائل من فيسبوك ====
-app.post("/webhook", (req, res) => {
+app.post("/webhook", async (req, res) => {
   const body = req.body;
 
   if (body.object === "page") {
@@ -156,6 +166,7 @@ app.post("/webhook", (req, res) => {
       if (!entry.messaging || entry.messaging.length === 0) continue;
       const webhookEvent = entry.messaging[0];
 
+      // إذا رد الأدمن يدوياً من المسنجر: يتم إسكات البوت نهائياً
       if (webhookEvent.message && webhookEvent.message.is_echo) {
         const customerId = webhookEvent.recipient.id;
         adminMutedUsers.add(customerId);
@@ -165,14 +176,39 @@ app.post("/webhook", (req, res) => {
 
       const senderId = webhookEvent.sender ? webhookEvent.sender.id : null;
 
-      if (senderId && webhookEvent.message && webhookEvent.message.text) {
+      if (senderId && webhookEvent.message) {
         if (isBotPaused(senderId)) {
           console.log("🔇 البوت متوقف نهائياً على العميل لتكفل الأدمن به:", senderId);
           continue;
         }
 
-        const userMessage = webhookEvent.message.text;
-        handleMessageWithRetry(senderId, userMessage);
+        // فحص المرفقات (Attachments)
+        let isAudio = false;
+        let imageUrl = null;
+
+        if (webhookEvent.message.attachments && webhookEvent.message.attachments.length > 0) {
+          const attachment = webhookEvent.message.attachments[0];
+          if (attachment.type === "audio") {
+            isAudio = true;
+          } else if (attachment.type === "image" && attachment.payload && attachment.payload.url) {
+            imageUrl = attachment.payload.url;
+          }
+        }
+
+        // إذا كان تسجيلاً صوتياً: يرد مباشرة بدون المرور على الذكاء الاصطناعي
+        if (isAudio) {
+          await sendTypingIndicator(senderId);
+          await sleep(1000);
+          await sendMessage(senderId, "ممكن تكتب اخي او انتظر تدخل الادمن بعد لحظات");
+          continue;
+        }
+
+        const userMessage = webhookEvent.message.text || "";
+
+        // إذا كانت صورة أو نص، نعالجها عبر النموذج
+        if (userMessage || imageUrl) {
+          handleMessageWithRetry(senderId, userMessage, imageUrl);
+        }
       }
     }
   } else {
@@ -194,7 +230,7 @@ async function sendTypingIndicator(recipientId) {
 }
 
 // ==== معالجة الرسالة مع إعادة المحاولة ====
-async function handleMessageWithRetry(senderId, userMessage) {
+async function handleMessageWithRetry(senderId, userMessage, imageUrl) {
   let attempt = 0;
   let toldUserToWait = false;
 
@@ -202,7 +238,7 @@ async function handleMessageWithRetry(senderId, userMessage) {
 
   while (attempt < MAX_RETRIES) {
     try {
-      const replyText = await askOpenRouter(senderId, userMessage);
+      const replyText = await askOpenRouter(senderId, userMessage, imageUrl);
       const cleanReply = cleanMarkdown(replyText);
       await sendMessage(senderId, cleanReply);
       return;
@@ -228,20 +264,36 @@ async function handleMessageWithRetry(senderId, userMessage) {
 }
 
 // ==== الاتصال بنموذج الذكاء الاصطناعي عبر OpenRouter ====
-async function askOpenRouter(senderId, message) {
+async function askOpenRouter(senderId, message, imageUrl) {
   const url = "https://openrouter.ai/api/v1/chat/completions";
 
   if (!conversations[senderId]) {
     conversations[senderId] = [];
   }
 
-  const lastMsg = conversations[senderId][conversations[senderId].length - 1];
-  if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== message) {
-    conversations[senderId].push({
-      role: "user",
-      content: message,
-    });
+  // بناء محتوى الرسالة (نص + صورة إن وجدت)
+  let messageContent;
+  if (imageUrl) {
+    messageContent = [
+      {
+        type: "text",
+        text: message ? message : "شوف هاد الصورة خويا وقولي واش رأيك فيها.",
+      },
+      {
+        type: "image_url",
+        image_url: {
+          url: imageUrl,
+        },
+      },
+    ];
+  } else {
+    messageContent = message;
   }
+
+  conversations[senderId].push({
+    role: "user",
+    content: messageContent,
+  });
 
   if (conversations[senderId].length > MAX_HISTORY) {
     conversations[senderId] = conversations[senderId].slice(-MAX_HISTORY);
@@ -263,7 +315,7 @@ async function askOpenRouter(senderId, message) {
         Authorization: "Bearer " + OPENROUTER_API_KEY,
         "Content-Type": "application/json",
       },
-      timeout: 15000,
+      timeout: 20000,
     }
   );
 
