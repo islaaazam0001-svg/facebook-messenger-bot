@@ -16,8 +16,8 @@ const MAX_RETRIES = 3;
 // ==== نظام سكوت البوت نهائياً كي يرد الأدمن ====
 const adminMutedUsers = new Set();
 
-// ==== تتبع الرسائل اللي بعثها البوت نفسو، باش ما نخلطوهاش مع رد الأدمن ====
-const botSentMids = new Map(); // mid -> timestamp
+// ==== تتبع الرسائل اللي بعثها البوت نفسو ====
+const botSentMids = new Map();
 
 function rememberBotMessage(mid) {
   if (mid) botSentMids.set(mid, Date.now());
@@ -38,8 +38,8 @@ function isBotPaused(customerId) {
   return adminMutedUsers.has(customerId);
 }
 
-// ==== حماية ضد إعادة إرسال فيسبوك لنفس الرسالة (webhook retry) ====
-const processedIncomingMids = new Map(); // mid -> timestamp
+// ==== حماية ضد إعادة إرسال فيسبوك لنفس الرسالة ====
+const processedIncomingMids = new Map();
 
 function alreadyProcessed(mid) {
   if (!mid) return false;
@@ -54,6 +54,29 @@ setInterval(() => {
     if (now - ts > 10 * 60 * 1000) processedIncomingMids.delete(mid);
   }
 }, 60 * 1000);
+
+// ==== نظام تجميع الرسائل المتتالية (Debounce) لمنع الرد المزدوج ====
+const userBuffers = new Map(); // senderId -> { texts: [], timer: timeoutObj }
+
+function handleUserMessageBuffered(senderId, text) {
+  if (!userBuffers.has(senderId)) {
+    userBuffers.set(senderId, { texts: [], timer: null });
+  }
+
+  const userBuffer = userBuffers.get(senderId);
+  userBuffer.texts.push(text);
+
+  if (userBuffer.timer) {
+    clearTimeout(userBuffer.timer);
+  }
+
+  // يستنى 2.5 ثانية؛ إذا زاد الزبون بعث كلمة يجمعها مع الأولى، ومبعد يجاوب مرة وحدة
+  userBuffer.timer = setTimeout(() => {
+    const combinedMessage = userBuffer.texts.join(" ");
+    userBuffers.delete(senderId);
+    handleMessageWithRetry(senderId, combinedMessage);
+  }, 2500);
+}
 
 function cleanMarkdown(text) {
   return text
@@ -73,8 +96,8 @@ const SYSTEM_PROMPT = `أنت هو مول محل "SIKI STORE". تهدر ديما
 
 الردود النموذجية الحرفية حسب الحالات:
 
-1. التحية:
-- إذا قال الزبون: سلام / سلام عليكم / مسا الخير:
+1. التحية أو النداء (سلام، اخي، خويا، واش راك):
+- إذا قال الزبون: سلام / اخي / خويا / سلام عليكم / مسا الخير:
 الرد: "وعليكم السلام خويا/أختي، مرحبا بك. واش راك حاب تفعّل؟"
 
 2. السؤال عن كل الاشتراكات والأسعار:
@@ -191,7 +214,8 @@ app.post("/webhook", (req, res) => {
         }
 
         const userMessage = webhookEvent.message.text;
-        handleMessageWithRetry(senderId, userMessage);
+        // استعمال التجميع التلقائي للرسائل
+        handleUserMessageBuffered(senderId, userMessage);
       }
     }
   } else {
