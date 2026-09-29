@@ -9,14 +9,14 @@ const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const PORT = process.env.PORT || 3000;
 
-// ==== الروابط الخاصة بالتقييم ====
+// ==== الروابط الخاصة بالتقييم والصور المباشرة ====
 // 1. خاص بـ سناب شات بلس
 const SNAP_POST_URL = "https://www.facebook.com/share/p/1DDcYqcPb8/";
-const SNAP_IMAGE_URL = "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=800";
+const SNAP_IMAGE_URL = "https://i.ibb.co/sJcbbhsc/image.png";
 
 // 2. خاص بـ صناع المحتوى (Canva, Gemini, CapCut)
 const CREATOR_POST_URL = "https://www.facebook.com/share/p/19YKrrgCvX/";
-const CREATOR_IMAGE_URL = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800";
+const CREATOR_IMAGE_URL = "https://i.ibb.co/G4r9Q8h1/image.png";
 
 const conversations = {};
 const userProfiles = {};
@@ -81,7 +81,7 @@ async function getUserName(senderId) {
   return null;
 }
 
-// ==== دالة كشف نوع المنتج تلقائياً من سياق المحادثة (لحالة #تم) ====
+// ==== دالة كشف نوع المنتج تلقائياً من سياق المحادثة ====
 function detectPurchasedCategory(customerId) {
   const history = conversations[customerId] || [];
   const fullText = history.map((m) => m.content).join(" ").toLowerCase();
@@ -108,7 +108,7 @@ async function sendFeedbackTemplate(recipientId, type = "snap") {
   const isSnap = type === "snap";
   const postUrl = isSnap ? SNAP_POST_URL : CREATOR_POST_URL;
   const imageUrl = isSnap ? SNAP_IMAGE_URL : CREATOR_IMAGE_URL;
-  const titleText = isSnap ? "بصحتك تفعيل Snapchat Plus! ⭐" : "بصحتك تفعيل اشتراكك مع SIKI STORE! ⭐";
+  const titleText = isSnap ? "بصحتك تفعيل Snapchat Plus! ⭐" : "بصحتك تفعيل باقة صناع المحتوى! ⭐";
   const subtitleText = isSnap 
     ? "رأيك يهمنا بزاف، اضغط على الزر وشاركنا تجربتك في منشور سناب شات لدعم المصداقية."
     : "رأيك يهمنا بزاف، اضغط على الزر وشاركنا تجربتك في منشور صناع المحتوى لدعم المصداقية.";
@@ -242,7 +242,6 @@ app.post("/webhook", async (req, res) => {
         const mid = webhookEvent.message.mid;
         const customerId = webhookEvent.recipient.id;
         const rawText = webhookEvent.message.text ? webhookEvent.message.text.trim() : "";
-        // إزالة الحرف الخفي الخاص بترميز الإيموجي في بعض الهواتف
         const adminText = rawText.replace(/\uFE0F/g, "");
 
         if (wasSentByBot(mid)) {
