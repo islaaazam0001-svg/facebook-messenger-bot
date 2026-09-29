@@ -9,14 +9,14 @@ const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const PORT = process.env.PORT || 3000;
 
-// ==== الروابط الخاصة بالتقييم والصور المباشرة ====
+// ==== الروابط الخاصة بالتقييم والصور المباشرة الرسمية ====
 // 1. خاص بـ سناب شات بلس
 const SNAP_POST_URL = "https://www.facebook.com/share/p/1DDcYqcPb8/";
-const SNAP_IMAGE_URL = "https://i.ibb.co/sJcbbhsc/image.png";
+const SNAP_IMAGE_URL = "https://i.ibb.co/WpvGYkR8/FB-IMG-1790662787547.jpg";
 
 // 2. خاص بـ صناع المحتوى (Canva, Gemini, CapCut)
 const CREATOR_POST_URL = "https://www.facebook.com/share/p/19YKrrgCvX/";
-const CREATOR_IMAGE_URL = "https://i.ibb.co/G4r9Q8h1/image.png";
+const CREATOR_IMAGE_URL = "https://i.ibb.co/C5yr7RRk/FB-IMG-1790661747952.jpg";
 
 const conversations = {};
 const userProfiles = {};
@@ -81,7 +81,7 @@ async function getUserName(senderId) {
   return null;
 }
 
-// ==== دالة كشف نوع المنتج تلقائياً من سياق المحادثة ====
+// ==== دالة كشف نوع المنتج تلقائياً من سياق المحادثة (لحالة #تم) ====
 function detectPurchasedCategory(customerId) {
   const history = conversations[customerId] || [];
   const fullText = history.map((m) => m.content).join(" ").toLowerCase();
@@ -250,17 +250,17 @@ app.post("/webhook", async (req, res) => {
           adminMutedUsers.add(customerId);
           console.log("🛑 الأدمن رد يدوياً. تم إسكات البوت على العميل:", customerId);
 
-          // 1. خيار إيموجي مضاعف: صناع المحتوى (Gemini, Canva, CapCut)
+          // 1. إيموجي مضاعف: صناع المحتوى (Gemini, Canva, CapCut)
           if (adminText === "✅✅") {
             console.log(`🎯 تم إرسال تقييم صناع المحتوى للعميل (${customerId}) عبر ✅✅`);
             await sendFeedbackTemplate(customerId, "creator");
           }
-          // 2. خيار إيموجي مفرد: سناب شات بلس
+          // 2. إيموجي مفرد: سناب شات بلس
           else if (adminText === "✅") {
             console.log(`🎯 تم إرسال تقييم سناب شات للعميل (${customerId}) عبر ✅`);
             await sendFeedbackTemplate(customerId, "snap");
           }
-          // 3. خيار #تم التقليدي بالتعرف التلقائي
+          // 3. خيار #تم التلقائي
           else if (adminText.toLowerCase() === "#تم" || adminText.toLowerCase() === "#feedback") {
             const detectedType = detectPurchasedCategory(customerId);
             console.log(`🎯 تم التعرف تلقائياً (${customerId}): ${detectedType}`);
