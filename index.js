@@ -81,7 +81,7 @@ async function getUserName(senderId) {
   return null;
 }
 
-// ==== دالة كشف نوع المنتج تلقائياً من سياق المحادثة ====
+// ==== دالة كشف نوع المنتج تلقائياً من سياق المحادثة (لحالة #تم) ====
 function detectPurchasedCategory(customerId) {
   const history = conversations[customerId] || [];
   const fullText = history.map((m) => m.content).join(" ").toLowerCase();
@@ -241,7 +241,9 @@ app.post("/webhook", async (req, res) => {
       if (webhookEvent.message && webhookEvent.message.is_echo) {
         const mid = webhookEvent.message.mid;
         const customerId = webhookEvent.recipient.id;
-        const adminText = webhookEvent.message.text ? webhookEvent.message.text.trim().toLowerCase() : "";
+        const rawText = webhookEvent.message.text ? webhookEvent.message.text.trim() : "";
+        // إزالة الحرف الخفي الخاص بترميز الإيموجي في بعض الهواتف
+        const adminText = rawText.replace(/\uFE0F/g, "");
 
         if (wasSentByBot(mid)) {
           botSentMids.delete(mid);
@@ -249,10 +251,20 @@ app.post("/webhook", async (req, res) => {
           adminMutedUsers.add(customerId);
           console.log("🛑 الأدمن رد يدوياً. تم إسكات البوت على العميل:", customerId);
 
-          // عند كتابة #تم يتعرف البوت تلقائياً على ما اشتراه الزبون
-          if (adminText === "#تم" || adminText === "#feedback") {
+          // 1. خيار إيموجي مضاعف: صناع المحتوى (Gemini, Canva, CapCut)
+          if (adminText === "✅✅") {
+            console.log(`🎯 تم إرسال تقييم صناع المحتوى للعميل (${customerId}) عبر ✅✅`);
+            await sendFeedbackTemplate(customerId, "creator");
+          }
+          // 2. خيار إيموجي مفرد: سناب شات بلس
+          else if (adminText === "✅") {
+            console.log(`🎯 تم إرسال تقييم سناب شات للعميل (${customerId}) عبر ✅`);
+            await sendFeedbackTemplate(customerId, "snap");
+          }
+          // 3. خيار #تم التقليدي بالتعرف التلقائي
+          else if (adminText.toLowerCase() === "#تم" || adminText.toLowerCase() === "#feedback") {
             const detectedType = detectPurchasedCategory(customerId);
-            console.log(`🎯 تم التعرف تلقائياً على طلب العميل (${customerId}): ${detectedType}`);
+            console.log(`🎯 تم التعرف تلقائياً (${customerId}): ${detectedType}`);
             await sendFeedbackTemplate(customerId, detectedType);
           }
         }
