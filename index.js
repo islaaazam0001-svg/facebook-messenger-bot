@@ -9,6 +9,15 @@ const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const PORT = process.env.PORT || 3000;
 
+// ==== الروابط الخاصة بالتقييم ====
+// 1. خاص بـ سناب شات بلس
+const SNAP_POST_URL = "https://www.facebook.com/share/p/1DDcYqcPb8/";
+const SNAP_IMAGE_URL = "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=800";
+
+// 2. خاص بـ صناع المحتوى (Canva, Gemini, CapCut)
+const CREATOR_POST_URL = "https://www.facebook.com/share/p/19YKrrgCvX/";
+const CREATOR_IMAGE_URL = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800";
+
 const conversations = {};
 const userProfiles = {};
 const MAX_HISTORY = 20;
@@ -17,7 +26,7 @@ const MAX_RETRIES = 3;
 // ==== نظام سكوت البوت نهائياً كي يرد الأدمن ====
 const adminMutedUsers = new Set();
 
-// ==== تتبع الرسائل اللي بعثها البوت نفسو ====
+// ==== تتبع الرسائل التي بعثها البوت نفسه ====
 const botSentMids = new Map();
 
 function rememberBotMessage(mid) {
@@ -72,6 +81,74 @@ async function getUserName(senderId) {
   return null;
 }
 
+// ==== دالة كشف نوع المنتج تلقائياً من سياق المحادثة ====
+function detectPurchasedCategory(customerId) {
+  const history = conversations[customerId] || [];
+  const fullText = history.map((m) => m.content).join(" ").toLowerCase();
+
+  const isSnap = /snap|سناب|snp|ايفون|iphone|اندرويد|android|ريجيون|region/i.test(fullText);
+  const isCreator = /canva|كانفا|gemini|جيميناي|capcut|كابكات|تصميم|مونتاج/i.test(fullText);
+
+  if (isSnap && !isCreator) return "snap";
+  if (isCreator && !isSnap) return "creator";
+
+  for (let i = history.length - 1; i >= 0; i--) {
+    const text = history[i].content.toLowerCase();
+    if (/snap|سناب|snp|ايفون|iphone|اندرويد|android/i.test(text)) return "snap";
+    if (/canva|كانفا|gemini|جيميناي|capcut|كابكات/i.test(text)) return "creator";
+  }
+
+  return "snap";
+}
+
+// ==== دالة إرسال بطاقة التقييم التفاعلية الاحترافية ====
+async function sendFeedbackTemplate(recipientId, type = "snap") {
+  const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
+  
+  const isSnap = type === "snap";
+  const postUrl = isSnap ? SNAP_POST_URL : CREATOR_POST_URL;
+  const imageUrl = isSnap ? SNAP_IMAGE_URL : CREATOR_IMAGE_URL;
+  const titleText = isSnap ? "بصحتك تفعيل Snapchat Plus! ⭐" : "بصحتك تفعيل اشتراكك مع SIKI STORE! ⭐";
+  const subtitleText = isSnap 
+    ? "رأيك يهمنا بزاف، اضغط على الزر وشاركنا تجربتك في منشور سناب شات لدعم المصداقية."
+    : "رأيك يهمنا بزاف، اضغط على الزر وشاركنا تجربتك في منشور صناع المحتوى لدعم المصداقية.";
+
+  const payload = {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "generic",
+          elements: [
+            {
+              title: titleText,
+              image_url: imageUrl,
+              subtitle: subtitleText,
+              buttons: [
+                {
+                  type: "web_url",
+                  url: postUrl,
+                  title: "اترك تقييمك هنا ⭐",
+                  webview_height_ratio: "full"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  };
+
+  try {
+    const res = await axios.post(url, payload);
+    const mid = res.data && res.data.message_id;
+    rememberBotMessage(mid);
+  } catch (err) {
+    console.error("خطأ في إرسال البطاقة التفاعلية:", err.response?.data || err.message);
+  }
+}
+
 // ==== نظام تجميع الرسائل المتتالية (Debounce) ====
 const userBuffers = new Map();
 
@@ -109,7 +186,10 @@ const SYSTEM_PROMPT = `أنت تعمل في خدمة الزبائن لمتجر "
 معلومات المتجر الثابتة (ممنوع اختراع أي سعر أو عرض آخر):
 - CANVA PRO: ثلاث سنوات بـ 500 دج (التفعيل: يبعث إيميله ونبعتولوا دعوة).
 - GEMINI PRO: 18 شهر بـ 1000 دج (التفعيل: رابط تفعيل في حسابه الشخصي).
-- CAPCUT PRO: شهر واحد بـ 1000 دج فقط (يمشي في التطبيق فالهاتف وفالحاسوب عبر إيميل وكلمة سر من عندنا).
+- CAPCUT PRO:
+  * شهر واحد بـ 1000 دج.
+  * 6 أشهر بـ 3500 دج.
+  (التفعيل: يمشي في التطبيق فالهاتف وفالحاسوب عبر إيميل وكلمة سر من عندنا).
 - SNAPCHAT PLUS: 
   * 3 أشهر بـ 1500 دج
   * 6 أشهر بـ 2200 دج
@@ -119,7 +199,7 @@ const SYSTEM_PROMPT = `أنت تعمل في خدمة الزبائن لمتجر "
 - الدفع: بريدي موب، CCP، فليكسي (+20%)، ونقبل فيزا/ماستركارد إذا سأل عنها حصراً.
 
 منطق التعامل مع المحادثة:
-1. الجنس: إذا كان الاسم لأنثى خاطبها بـ "أختي" وبصيغة المؤنث، وإذا لذكر خاطبه بـ "خويا/أخي" (ممنوع الشرطة خويا/أختي نهائياً).
+1. الجنس: إذا كان الاسم لأنثى خاطبها بـ "أختي" وبصيغة المؤنث، وإذا لذكر خاطبه بـ "خويا/أخي" (ممنوع الشرطة خويا/أختي نهائياً). وإذا كان الاسم رمزياً أو غير واضح لا تقل خويا ولا أختي ورد بأسلوب محايد وراقي.
 2. لا تشرح طريقة التفعيل من تلقاء نفسك إلا إذا سأل الزبون كيفاش يتفعل.
 3. إذا قال الزبون شكراً، أوكي، أو كلمة ختامية: رد بـ "مرحبا بك خويا/أختي" فقط وتوقف عن طرح الأسئلة ولا تلح عليه.
 4. مرحلة الدفع والإيميل:
@@ -131,7 +211,7 @@ function sleep(ms) {
 }
 
 app.get("/", (req, res) => {
-  res.send("SIKI STORE Bot (Smart Gemini Engine) is running ✅");
+  res.send("SIKI STORE Bot running ✅");
 });
 
 app.get("/webhook", (req, res) => {
@@ -147,7 +227,7 @@ app.get("/webhook", (req, res) => {
   }
 });
 
-app.post("/webhook", (req, res) => {
+app.post("/webhook", async (req, res) => {
   const body = req.body;
 
   if (body.object === "page") {
@@ -157,15 +237,24 @@ app.post("/webhook", (req, res) => {
       if (!entry.messaging || entry.messaging.length === 0) continue;
       const webhookEvent = entry.messaging[0];
 
+      // فحص الرسائل الصادرة من الأدمن
       if (webhookEvent.message && webhookEvent.message.is_echo) {
         const mid = webhookEvent.message.mid;
         const customerId = webhookEvent.recipient.id;
+        const adminText = webhookEvent.message.text ? webhookEvent.message.text.trim().toLowerCase() : "";
 
         if (wasSentByBot(mid)) {
           botSentMids.delete(mid);
         } else {
           adminMutedUsers.add(customerId);
-          console.log("🛑 الأدمن رد يدوياً. تم إسكات البوت نهائياً على العميل:", customerId);
+          console.log("🛑 الأدمن رد يدوياً. تم إسكات البوت على العميل:", customerId);
+
+          // عند كتابة #تم يتعرف البوت تلقائياً على ما اشتراه الزبون
+          if (adminText === "#تم" || adminText === "#feedback") {
+            const detectedType = detectPurchasedCategory(customerId);
+            console.log(`🎯 تم التعرف تلقائياً على طلب العميل (${customerId}): ${detectedType}`);
+            await sendFeedbackTemplate(customerId, detectedType);
+          }
         }
         continue;
       }
@@ -255,7 +344,7 @@ async function askOpenRouter(senderId, message) {
 
   const customerName = await getUserName(senderId);
   const promptWithContext = customerName 
-    ? `${SYSTEM_PROMPT}\n\nمعلومة إضافية: اسم الزبون الحالي في فيسبوك هو: "${customerName}". إذا كان الاسم لأنثى خاطبها حصراً بـ "أختي" وصيغة المؤنث، وإذا كان لذكر خاطبه بـ "خويا/أخي".`
+    ? `${SYSTEM_PROMPT}\n\nمعلومة إضافية: اسم الزبون الحالي في فيسبوك هو: "${customerName}". إذا كان الاسم لأنثى خاطبها حصراً بـ "أختي" وصيغة المؤنث، وإذا كان لذكر خاطبه بـ "خويا/أخي". وإذا كان الاسم غير محدد أو رمزي لا تقل خويا ولا أختي.`
     : SYSTEM_PROMPT;
 
   const lastMsg = conversations[senderId][conversations[senderId].length - 1];
@@ -325,5 +414,5 @@ setInterval(() => {
 }, 14 * 60 * 1000);
 
 app.listen(PORT, () => {
-  console.log("🚀 SIKI STORE Bot (Smart Gemini Engine) running on port " + PORT);
+  console.log("🚀 SIKI STORE Bot running on port " + PORT);
 });
