@@ -86,7 +86,7 @@ function detectPurchasedCategory(customerId) {
   const history = conversations[customerId] || [];
   const fullText = history.map((m) => m.content).join(" ").toLowerCase();
 
-  const isSnap = /snap|سناب|snp|ايفون|iphone|اندرويد|android|ريجيون|region/i.test(fullText);
+  const isSnap = /snap|سناب|snp|ايفون|iphone/i.test(fullText);
   const isCreator = /canva|كانفا|gemini|جيميناي|capcut|كابكات|تصميم|مونتاج/i.test(fullText);
 
   if (isSnap && !isCreator) return "snap";
@@ -94,7 +94,7 @@ function detectPurchasedCategory(customerId) {
 
   for (let i = history.length - 1; i >= 0; i--) {
     const text = history[i].content.toLowerCase();
-    if (/snap|سناب|snp|ايفون|iphone|اندرويد|android/i.test(text)) return "snap";
+    if (/snap|سناب|snp|ايفون|iphone/i.test(text)) return "snap";
     if (/canva|كانفا|gemini|جيميناي|capcut|كابكات/i.test(text)) return "creator";
   }
 
@@ -202,12 +202,16 @@ const SYSTEM_PROMPT = `أنت تمثل متجر "SIKI STORE" في الجزائر
    - إذا سأل عن سعر خدمة، اعرض الأسعار الأصلية وضع في آخر نفس الرسالة:
      الدفع عن طريق فليكسي +20% من السعر الأصلي.
    - لا ترسل جملة الفليكسي في رسالة منفصلة لوحدها أبداً.
-   - إذا سأل "شحال بالفليكسي؟" احسب له السعر مباشرة (سناب عام آيفون = 3240 دج، سناب عام أندرويد = 4800 دج، كانفا 3 سنوات = 600 دج، جيميناي = 1200 دج، كابكات شهر = 1200 دج، كابكات 6 أشهر = 4200 دج).
+   - إذا سأل الزبون "شحال بالفليكسي؟" احسب له السعر مباشرة (سناب 12 شهر آيفون بالفليكسي = 3240 دج، كانفا 3 سنوات = 600 دج، جيميناي = 1200 دج، كابكات شهر = 1200 دج، كابكات 6 أشهر = 4200 دج).
 6. نهاية المحادثة والرد على "اوكي":
    - إذا قال الزبون "اوكي" أو "اوك" بعدما طلبت منه الانتظار أو بعد تفاصيل الدفع: قل فقط "تمام خويا، لحظات ويكون معاك" أو "ربي يحفظك خويا".
    - ممنوع نهائياً أن تعيد "مرحبا بك خويا" على كل كلمة ختامية مثل الصدى.
 
-الأسعار الرسمية للمتجر:
+الأسعار الرسمية والاشتراكات المتوفرة في المتجر:
+- SNAPCHAT PLUS:
+  متوفر حصراً:
+  • 12 شهر للآيفون فقط بـ 2700 دج.
+  (تنبيه: لا يوجد 3 أشهر ولا 6 أشهر ولا أندرويد نهائياً، ولا تذكر أي تفاصيل أخرى عن طريقة التفعيل إلا إذا سأل).
 - CANVA PRO:
   3 سنوات بـ 500 دج (التفعيل: يبعث إيميله ونبعتولوا دعوة).
 - GEMINI PRO:
@@ -217,13 +221,10 @@ const SYSTEM_PROMPT = `أنت تمثل متجر "SIKI STORE" في الجزائر
   • شهر واحد بـ 1000 دج
   • 6 أشهر بـ 3500 دج
   (التفعيل: يمشي فالهاتف وفالحاسوب عبر إيميل وكلمة سر من عندنا).
-- SNAPCHAT PLUS:
-  Snapchat Plus:
-  • 3 أشهر بـ 1500 دج
-  • 6 أشهر بـ 2200 دج
-  • عام بـ 2700 دج (للآيفون)
-  • عام بـ 4000 دج (للأندرويد).
-- الضمان: كامل المدة، أي مشكل يراسلنا.`;
+- الضمان: كامل المدة، أي مشكل يراسلنا.
+
+مرحلة الدفع:
+- أنت لا تملك أرقام الحسابات (RIP/CCP)؛ إذا طلب الحساب للدفع، قل له يدخل مسؤول التحويلات بعد لحظات يمدلك الحساب باش تفيري والتفعيل سريع بعد إرسال الوصل.`;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -440,7 +441,7 @@ setInterval(() => {
   axios
     .get(SELF_URL)
     .then(() => console.log("🔄 Self-ping OK"))
-    .catch((err) => console.log("⚠️ Self-ping failed:", err.message));
+    .catch((err) => console.log("⚠️️ Self-ping failed:", err.message));
 }, 14 * 60 * 1000);
 
 app.listen(PORT, () => {
