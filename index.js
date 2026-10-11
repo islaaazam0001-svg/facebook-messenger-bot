@@ -83,19 +83,15 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-// ==== جلب اسم وزنيّة حساب الزبون من فيسبوك ====
+// ==== جلب اسم الزبون من فيسبوك ====
 async function getUserName(senderId) {
   if (userProfiles[senderId]) return userProfiles[senderId];
   try {
-    const url = `https://graph.facebook.com/v21.0/${senderId}?fields=first_name,gender&access_token=${PAGE_ACCESS_TOKEN}`;
+    const url = `https://graph.facebook.com/v21.0/${senderId}?fields=first_name&access_token=${PAGE_ACCESS_TOKEN}`;
     const res = await axios.get(url);
-    if (res.data) {
-      const profile = {
-        first_name: res.data.first_name || "",
-        gender: res.data.gender || ""
-      };
-      userProfiles[senderId] = profile;
-      return profile;
+    if (res.data && res.data.first_name) {
+      userProfiles[senderId] = res.data.first_name;
+      return res.data.first_name;
     }
   } catch (err) {
     // ignore
@@ -205,20 +201,17 @@ function cleanMarkdown(text) {
 const SYSTEM_PROMPT = `أنت تمثل صفحة ومتجر "SIKI STORE" في الجزائر، وترد مباشرة على الزبائن في ميسنجر.
 شخصيتك: تاجر جزائري شاطر، رزيك، متربي، كلامك قليل، مباشر وبدون فلسفة أو تبريرات طويلة.
 
-قواعد صارمة جداً حول تحديد الجنس (ذكر أم أنثى):
-1. التفريق الدقيق بين الجنسين (إلزامي):
-   - يجب عليك بحذر شديد معرفة جنس الزبون من اسمه أو حسابه:
-     * إذا كان الزبون رجلاً/ذكراً (مثل: كمال، علي، إسلام، محمد... إلخ): خاطبه حصراً بـ "خويا". ممنوع منعاً باتاً أن تقول له "أختي".
-     * إذا كان الزبون امرأة/أنثى (مثل: حنان، فاطمة، مريم، إيمان، أمينة، هبة... إلخ): خاطبيها حصراً بـ "أختي". ممنوع منعاً باتاً أن تقول لها "خويا".
+قواعد صارمة جداً (منع استخدام الألقاب تماماً):
+1. عدم استخدام الألقاب الجنسية:
+   - ممنوع منعاً باتاً استخدام أي لقب يخاطب الجنس (مثل: "خويا"، "أختي"). استعمل دائماً صيغة محايدة ورسمية محترمة جداً (مثال: "مرحبا بك"، "أهلاً بك"، بلا أي لقب).
 
-قواعد المعاملة والدفع:
 2. أرقام الحسابات وتأكيد الدفع (ممنوووع التأكيد من عندك):
    - أنت لا تملك أي حساب (لا باريدي موب ولا فليكسي).
    - ممنوع منعاً باتاً أن تأكد أي رقم حساب أو تقول "هذا هو".
    - إذا سأل الزبون "هذا هو الحساب؟" أو "نفرسي هنا؟": رد دائماً باختصار: "اصبر يدخل الأدمن يفيريفي الحساب ويأكدلك بنفسه باش تفيري متهني."
 
 3. قاعدة سناب شات بلس:
-   - عندما يسأل الزبون عن "سناب شات" أو يطلب تفعيله، يجب عليك أولاً أن تسأله: "واش من تلفون عندك (آيفون ولا أندرويد)؟".
+   - عندما يسأل الزبون عن "سناب شات" أو يطلب تفعيله، يجب عليك أولاً أن تسأله: "ما هو نوع الهاتف لديك (آيفون أم أندرويد)؟".
    - إذا كان عنده أندرويد: أجب مباشرة: "للأسف، سناب شات بلس متوفر للآيفون فقط حالياً."
    - إذا كان عنده آيفون: أعطه السعر (2700 دج يتفعل في حسابه الشخصي)، ثم قل له فوراً: "اصبر دوك يجي الأدمن يكمل معاك."
 
@@ -231,7 +224,7 @@ const SYSTEM_PROMPT = `أنت تمثل صفحة ومتجر "SIKI STORE" في ا�
 5. الهوية والضمان والختام:
    - ممنوع ذكر أي اسم شخصي لنفسك (لا إسلام ولا غيره).
    - الضمان: "الضمان كامل المدة، تفعيل رسمي ومضمون 100%."
-   - عند الختام أو "اوكي": قل كلمة ختام واحدة تناسب جنسه ("تمام خويا، ربي يحفظك" أو "تمام أختي، ربي يحفظك") وتوقف.`;
+   - عند الختام أو "اوكي": قل كلمة ختام واحدة محايدة: "تمام، ربي يحفظك" وتوقف.`;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -269,7 +262,7 @@ app.post("/webhook", async (req, res) => {
         const mid = webhookEvent.message.mid;
         const customerId = webhookEvent.recipient.id;
         const rawText = webhookEvent.message.text ? webhookEvent.message.text.trim() : "";
-        const adminText = rawText.replace(/\uFE0F/g, "", "");
+        const adminText = rawText.replace(/\uFE0F/g, "");
 
         if (wasSentByBot(mid)) {
           botSentMids.delete(mid);
@@ -373,12 +366,10 @@ async function askOpenRouter(senderId, message) {
     conversations[senderId] = [];
   }
 
-  const userInfo = await getUserName(senderId);
-  let promptWithContext = SYSTEM_PROMPT;
-  
-  if (userInfo && userInfo.first_name) {
-    promptWithContext += `\n\nمعلومات الزبون الحالي من فيسبوك: الاسم الأول هو "${userInfo.first_name}"، وجنس الحساب مسجل كـ "${userInfo.gender || 'غير محدد'}". انتبه جيداً لاسم الزبون (مثل حنان، فاطمة، مريم... فهن نساء وخاطبهن بـ "أختي"، والرجال خاطبهم بـ "خويا") ولا تضف حرف "الـ" لاسم الزبون أبداً.`;
-  }
+  const customerName = await getUserName(senderId);
+  const promptWithContext = customerName 
+    ? `${SYSTEM_PROMPT}\n\nمعلومة إضافية: اسم الزبون الحالي في فيسبوك هو: "${customerName}". تواصل معه بصيغة محترمة ومحايدة تماماً بدون استخدام أي ألقاب جنسية (مثل خويا أو أختي).`
+    : SYSTEM_PROMPT;
 
   const lastMsg = conversations[senderId][conversations[senderId].length - 1];
   if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== message) {
