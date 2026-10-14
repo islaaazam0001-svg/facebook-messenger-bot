@@ -30,7 +30,10 @@ let adminMutedUsers = new Set();
 try {
   if (fs.existsSync(MUTED_FILE)) {
     const data = fs.readFileSync(MUTED_FILE, "utf-8");
-    adminMutedUsers = new Set(JSON.parse(data));
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed)) {
+      adminMutedUsers = new Set(parsed);
+    }
   }
 } catch (e) {
   console.error("خطأ في قراءة ملف الزبائن المسكوتين:", e.message);
@@ -56,7 +59,7 @@ function rememberBotMessage(mid) {
 }
 
 function wasSentByBot(mid) {
-  return mid && botSentMids.has(mid);
+  return Boolean(mid && botSentMids.has(mid));
 }
 
 setInterval(() => {
@@ -88,13 +91,13 @@ async function getUserName(senderId) {
   if (userProfiles[senderId]) return userProfiles[senderId];
   try {
     const url = `https://graph.facebook.com/v21.0/${senderId}?fields=first_name&access_token=${PAGE_ACCESS_TOKEN}`;
-    const res = await axios.get(url);
+    const res = await axios.get(url, { timeout: 5000 });
     if (res.data && res.data.first_name) {
       userProfiles[senderId] = res.data.first_name;
       return res.data.first_name;
     }
   } catch (err) {
-    // ignore
+    // تجاهل الخطأ في حال عدم توفر الصلاحية لجلب الاسم
   }
   return null;
 }
@@ -104,7 +107,7 @@ function detectPurchasedCategory(customerId) {
   const history = conversations[customerId] || [];
   const fullText = history.map((m) => m.content).join(" ").toLowerCase();
 
-  const isSnap = /snap|سناب|snp|ايفون|iphone/i.test(fullText);
+  const isSnap = /snap|سناب|snp|ايفون|آيفون|iphone/i.test(fullText);
   const isCreator = /canva|كانفا|gemini|جيميناي|capcut|كابكات|تصميم|مونتاج/i.test(fullText);
 
   if (isSnap && !isCreator) return "snap";
@@ -112,7 +115,7 @@ function detectPurchasedCategory(customerId) {
 
   for (let i = history.length - 1; i >= 0; i--) {
     const text = history[i].content.toLowerCase();
-    if (/snap|سناب|snp|ايفون|iphone/i.test(text)) return "snap";
+    if (/snap|سناب|snp|ايفون|آيفون|iphone/i.test(text)) return "snap";
     if (/canva|كانفا|gemini|جيميناي|capcut|كابكات/i.test(text)) return "creator";
   }
 
@@ -122,12 +125,12 @@ function detectPurchasedCategory(customerId) {
 // ==== دالة إرسال بطاقة التقييم التفاعلية الاحترافية ====
 async function sendFeedbackTemplate(recipientId, type = "snap") {
   const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
-  
+
   const isSnap = type === "snap";
   const postUrl = isSnap ? SNAP_POST_URL : CREATOR_POST_URL;
   const imageUrl = isSnap ? SNAP_IMAGE_URL : CREATOR_IMAGE_URL;
   const titleText = isSnap ? "بصحتك تفعيل Snapchat Plus! ⭐" : "بصحتك تفعيل باقة صناع المحتوى! ⭐";
-  const subtitleText = isSnap 
+  const subtitleText = isSnap
     ? "رأيك يهمنا بزاف، اضغط على الزر وشاركنا تجربتك في منشور سناب شات لدعم المصداقية."
     : "رأيك يهمنا بزاف، اضغط على الزر وشاركنا تجربتك في منشور صناع المحتوى لدعم المصداقية.";
 
@@ -159,7 +162,7 @@ async function sendFeedbackTemplate(recipientId, type = "snap") {
   };
 
   try {
-    const res = await axios.post(url, payload);
+    const res = await axios.post(url, payload, { timeout: 10000 });
     const mid = res.data && res.data.message_id;
     rememberBotMessage(mid);
   } catch (err) {
@@ -171,6 +174,8 @@ async function sendFeedbackTemplate(recipientId, type = "snap") {
 const userBuffers = new Map();
 
 function handleUserMessageBuffered(senderId, text) {
+  if (isBotPaused(senderId)) return;
+
   if (!userBuffers.has(senderId)) {
     userBuffers.set(senderId, { texts: [], timer: null });
   }
@@ -183,37 +188,49 @@ function handleUserMessageBuffered(senderId, text) {
   }
 
   userBuffer.timer = setTimeout(() => {
-    const combinedMessage = userBuffer.texts.join(" ");
+    const combinedMessage = userBuffer.texts.join(" | ");
     userBuffers.delete(senderId);
-    handleMessageWithRetry(senderId, combinedMessage);
+    if (!isBotPaused(senderId)) {
+      handleMessageWithRetry(senderId, combinedMessage);
+    }
   }, 2500);
 }
 
 function cleanMarkdown(text) {
+  if (!text) return "";
   return text
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\*(.*?)\*/g, "$1")
     .replace(/__(.*?)__/g, "$1")
+    .replace(/`(.*?)`/g, "$1")
     .replace(/^#+\s+/gm, "")
-    .replace(/^[\*\-]\s+/gm, "• ");
+    .replace(/^[\*\-]\s+/gm, "• ")
+    .trim();
 }
 
-const SYSTEM_PROMPT = `أنت ممثل متجر "SIKI STORE" في الجزائر. أجب باختصار شديد وبالدارجة الجزائرية.
+// ==== التعليمات الصارمة للذكاء الاصطناعي ====
+const SYSTEM_PROMPT = `أنت مساعد آلي صارم ومباشر لمتجر "SIKI STORE" في الجزائر. تتحدث بالدارجة الجزائرية المحترمة والمحايدة، وتجيب باختصار شديد دون مقدمات أو ثرثرة.
 
-الخدمات والأسعار المتاحة حصراً في المتجر (ممنوع منعاً باتاً ذكر أو بيع أي خدمة أخرى غير هذه الأربعة):
-1. سناب شات بلس: 2700 دج (12 شهر، للآيفون فقط، يتفعل في حساب الزبون الشخصي).
-2. كانفا برو: 500 دج (3 سنوات).
-3. جيميناي برو: 1000 دج (18 شهر).
-4. كابكات برو: شهر بـ 1000 دج | 6 أشهر بـ 3500 دج.
+الخدمات والأسعار المعتمدة في المتجر (حصرياً هذه الأربعة فقط):
+• سناب شات بلس (Snapchat Plus): 2700 دج (لمدة 12 شهر، للآيفون فقط، التفعيل في الحساب الشخصي للزبون).
+• كانفا برو (Canva Pro): 500 دج (لمدة 3 سنوات).
+• جيميناي برو (Gemini Advanced): 1000 دج (لمدة 18 شهر).
+• كابكات برو (CapCut Pro): شهر بـ 1000 دج | 6 أشهر بـ 3500 دج.
 
-قواعد صارمة جداً:
-- عندما يطلب الزبون الأسعار (مثل: "Prix" أو "شحال الأسعار"): اعطه قائمة الأسعار مباشرة وبكل بساطة. **ممنوع تماماً** إضافة جملة "اصبر دوك يجي الأدمن يكمل معاك" في رسالة عرض الأسعار.
-- أضف جملة "اصبر دوك يجي الأدمن يكمل معاك" **فقط** إذا أراد الدفع، أو أراد تفعيل الخدمة، أو سأل عن الحساب والدفع.
-- إذا سأل الزبون عن أي خدمة أخرى غير موجودة في القائمة أعلاه (مثل: شات جي بي تي، غروك، نتفليكس، إلخ): قل له مباشرة باختصار شديد: "ما عندناش هذي الخدمة."
-- ممنوع اختراع الأسعار نهائياً.
-- ممنوع طلب كلمات السر أو إيميل الحساب من الزبون. إذا أراد إعطاءك حسابه قل له: "اصبر دوك يجي الأدمن يكمل معاك."
-- ممنوع استخدام الألقاب (لا خويا ولا أختي). تحدث بصيغة محايدة تماماً.
-- طرق الدفع: باريدي موب أو فليكسي (زائد 20%). ممنوع ذكر CCP أو فيزا.`;
+طرق الدفع المتوفرة فقط:
+• باريدي موب (BaridiMob).
+• فليكسي (Flexy) مع زيادة 20% على السعر الأصلي.
+
+قواعد صارمة جداً (ممنوع مخالفتها تحت أي ظرف):
+1. عند السؤال عن الأسعار (مثل: شحال، Prix، الأسعار): اذكر قائمة الأسعار مباشرة وبدقة. **ممنوع منعاً باتاً** كتابة جملة "اصبر دوك يجي الأدمن يكمل معاك" عند عرض الأسعار أو الإجابة عن استفسار عادي.
+2. جملة "اصبر دوك يجي الأدمن يكمل معاك" تُكتب **فقط وحصرياً** في الحالات التالية:
+   - إذا قال الزبون أنه يريد الشراء الآن أو طلب رقم الحساب للدفع (RIP / رقم الهاتف).
+   - إذا أرسل الزبون إيميل أو معلومات حسابه لتفعيل الخدمة.
+3. إذا سأل الزبون عن أي خدمة أخرى غير الخدمات الأربع المذكورة أعلاه (مثل: ChatGPT, Netflix, IPTV, Spotify, سناب للأندرويد...): أجب بهذه الجملة فقط دون أي إضافة: "ما عندناش هذي الخدمة."
+4. ممنوع اختراع أسعار أو تخفيضات أو مدد اشتراك غير مذكورة أعلاه.
+5. ممنوع طلب الإيميل أو كلمة السر من الزبون.
+6. ممنوع تماماً استخدام ألقاب مثل (خويا، أختي، صاحبي، خو، حنون). خاطب الزبون بصيغة محايدة دائماً.
+7. ممنوع ذكر CCP أو البطاقة الذهبية أو Visa أو PayPal.`;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -242,57 +259,88 @@ app.post("/webhook", async (req, res) => {
   if (body.object === "page") {
     res.status(200).send("EVENT_RECEIVED");
 
+    if (!body.entry || !Array.isArray(body.entry)) return;
+
     for (const entry of body.entry) {
-      if (!entry.messaging || entry.messaging.length === 0) continue;
-      const webhookEvent = entry.messaging[0];
+      if (!entry.messaging || !Array.isArray(entry.messaging)) continue;
 
-      if (webhookEvent.message && webhookEvent.message.is_echo) {
-        const mid = webhookEvent.message.mid;
-        const customerId = webhookEvent.recipient.id;
-        const rawText = webhookEvent.message.text ? webhookEvent.message.text.trim() : "";
-        const adminText = rawText.replace(/\uFE0F/g, "");
+      for (const webhookEvent of entry.messaging) {
+        // 1. معالجة رسائل الصفحة (Echo) لمعرفة تدخل الأدمن
+        if (webhookEvent.message && webhookEvent.message.is_echo) {
+          const mid = webhookEvent.message.mid;
+          const customerId = webhookEvent.recipient ? webhookEvent.recipient.id : null;
+          if (!customerId) continue;
 
-        if (wasSentByBot(mid)) {
-          botSentMids.delete(mid);
-        } else {
-          adminMutedUsers.add(customerId);
-          saveMutedUsers();
-          console.log("🛑 الأدمن رد يدوياً. تم إسكات البوت على العميل وحفظه في الملف:", customerId);
+          const rawText = webhookEvent.message.text ? webhookEvent.message.text.trim() : "";
+          const adminText = rawText.replace(/\uFE0F/g, "");
 
-          if (adminText === "✅✅") {
-            await sendFeedbackTemplate(customerId, "creator");
-          } else if (adminText === "✅") {
-            await sendFeedbackTemplate(customerId, "snap");
-          } else if (adminText.toLowerCase() === "#تم" || adminText.toLowerCase() === "#feedback") {
-            const detectedType = detectPurchasedCategory(customerId);
-            await sendFeedbackTemplate(customerId, detectedType);
+          if (wasSentByBot(mid)) {
+            botSentMids.delete(mid);
+          } else {
+            // إلغاء أي رد مؤقت قيد الانتظار لهذا الزبون فوراً
+            if (userBuffers.has(customerId)) {
+              clearTimeout(userBuffers.get(customerId).timer);
+              userBuffers.delete(customerId);
+            }
+
+            // السماح للأدمن بإعادة تشغيل البوت للزبون إذا كتب #بوت أو #bot
+            if (adminText.toLowerCase() === "#bot" || adminText === "#بوت") {
+              adminMutedUsers.delete(customerId);
+              saveMutedUsers();
+              console.log("🟢 تم إعادة تفعيل البوت للعميل:", customerId);
+              continue;
+            }
+
+            adminMutedUsers.add(customerId);
+            saveMutedUsers();
+            console.log("🛑 الأدمن رد يدوياً. تم إيقاف البوت للعميل:", customerId);
+
+            if (adminText === "✅✅") {
+              await sendFeedbackTemplate(customerId, "creator");
+            } else if (adminText === "✅") {
+              await sendFeedbackTemplate(customerId, "snap");
+            } else if (adminText.toLowerCase() === "#تم" || adminText.toLowerCase() === "#feedback") {
+              const detectedType = detectPurchasedCategory(customerId);
+              await sendFeedbackTemplate(customerId, detectedType);
+            }
           }
-        }
-        continue;
-      }
-
-      const senderId = webhookEvent.sender ? webhookEvent.sender.id : null;
-
-      if (senderId && webhookEvent.message) {
-        if (isBotPaused(senderId)) {
-          console.log("🔇 البوت متوقف نهائياً على العميل لتكفل الأدمن به:", senderId);
           continue;
         }
 
-        const incomingMid = webhookEvent.message.mid;
-        if (alreadyProcessed(incomingMid)) {
-          console.log("♻️ رسالة مكررة، تم تجاهلها:", incomingMid);
-          continue;
-        }
+        // 2. معالجة رسائل الزبون الواردة
+        const senderId = webhookEvent.sender ? webhookEvent.sender.id : null;
 
-        if (webhookEvent.message.attachments && webhookEvent.message.attachments.some(a => a.type === "image")) {
-          sendMessage(senderId, "يعطيك الصحة، اصبر شوية يدخل مسؤول الصفحة يفيريفي الوصل ويفعل لك فوراً.");
-          continue;
-        }
+        if (senderId && webhookEvent.message && !webhookEvent.message.is_echo) {
+          if (isBotPaused(senderId)) {
+            console.log("🔇 البوت متوقف على العميل لتكفل الأدمن به:", senderId);
+            continue;
+          }
 
-        if (webhookEvent.message.text) {
-          const userMessage = webhookEvent.message.text;
-          handleUserMessageBuffered(senderId, userMessage);
+          const incomingMid = webhookEvent.message.mid;
+          if (alreadyProcessed(incomingMid)) {
+            console.log("♻️ رسالة مكررة، تم تجاهلها:", incomingMid);
+            continue;
+          }
+
+          // في حال إرسال صورة (وصل دفع غالباً)
+          if (
+            webhookEvent.message.attachments &&
+            webhookEvent.message.attachments.some((a) => a.type === "image")
+          ) {
+            await sendMessage(
+              senderId,
+              "يعطيك الصحة، اصبر دوك يجي الأدمن يفيريفي الوصل ويكمل معاك التفعيل."
+            );
+            continue;
+          }
+
+          // في حال إرسال نص
+          if (webhookEvent.message.text) {
+            const userMessage = webhookEvent.message.text.trim();
+            if (userMessage) {
+              handleUserMessageBuffered(senderId, userMessage);
+            }
+          }
         }
       }
     }
@@ -304,32 +352,43 @@ app.post("/webhook", async (req, res) => {
 async function sendTypingIndicator(recipientId) {
   const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
   try {
-    await axios.post(url, {
-      recipient: { id: recipientId },
-      sender_action: "typing_on",
-    });
+    await axios.post(
+      url,
+      {
+        recipient: { id: recipientId },
+        sender_action: "typing_on",
+      },
+      { timeout: 5000 }
+    );
   } catch (err) {
-    // ignore
+    // تجاهل الخطأ
   }
 }
 
 async function handleMessageWithRetry(senderId, userMessage) {
+  if (isBotPaused(senderId)) return;
+
   let attempt = 0;
   let toldUserToWait = false;
 
   await sendTypingIndicator(senderId);
 
   while (attempt < MAX_RETRIES) {
+    if (isBotPaused(senderId)) return;
+
     try {
       const replyText = await askOpenRouter(senderId, userMessage);
       const cleanReply = cleanMarkdown(replyText);
-      await sendMessage(senderId, cleanReply);
+
+      if (!isBotPaused(senderId) && cleanReply) {
+        await sendMessage(senderId, cleanReply);
+      }
       return;
     } catch (err) {
       attempt++;
       console.error(`Attempt ${attempt} failed:`, err.response?.data || err.message);
 
-      if (!toldUserToWait) {
+      if (!toldUserToWait && !isBotPaused(senderId)) {
         await sendMessage(senderId, "دقيقة برك راني نشوفلك...");
         toldUserToWait = true;
       }
@@ -340,10 +399,12 @@ async function handleMessageWithRetry(senderId, userMessage) {
     }
   }
 
-  await sendMessage(
-    senderId,
-    "كاين ضغط شوية دك، عاود ابعثلي ميساج بعد لحظات ونجاوبك فورا."
-  );
+  if (!isBotPaused(senderId)) {
+    await sendMessage(
+      senderId,
+      "كاين ضغط شوية دك، عاود ابعثلي ميساج بعد لحظات ونجاوبك فوراً."
+    );
+  }
 }
 
 async function askOpenRouter(senderId, message) {
@@ -354,21 +415,14 @@ async function askOpenRouter(senderId, message) {
   }
 
   const customerName = await getUserName(senderId);
-  const promptWithContext = customerName 
-    ? `${SYSTEM_PROMPT}\n\nاسم الزبون: "${customerName}".`
+  const promptWithContext = customerName
+    ? `${SYSTEM_PROMPT}\n\nملاحظة: اسم الزبون هو "${customerName}" (لا تستخدم ألقاب مثل خويا أو أختي).`
     : SYSTEM_PROMPT;
 
-  const lastMsg = conversations[senderId][conversations[senderId].length - 1];
-  if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== message) {
-    conversations[senderId].push({
-      role: "user",
-      content: message,
-    });
-  }
-
-  if (conversations[senderId].length > MAX_HISTORY) {
-    conversations[senderId] = conversations[senderId].slice(-MAX_HISTORY);
-  }
+  const historyToSend = [
+    ...conversations[senderId],
+    { role: "user", content: message }
+  ].slice(-MAX_HISTORY);
 
   const response = await axios.post(
     url,
@@ -377,13 +431,13 @@ async function askOpenRouter(senderId, message) {
       temperature: 0.0,
       messages: [
         { role: "system", content: promptWithContext },
-        ...conversations[senderId],
+        ...historyToSend,
       ],
       max_tokens: 250,
     },
     {
       headers: {
-        Authorization: "Bearer " + OPENROUTER_API_KEY,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
       },
       timeout: 15000,
@@ -391,13 +445,16 @@ async function askOpenRouter(senderId, message) {
   );
 
   const reply =
-    response.data.choices?.[0]?.message?.content ||
-    "دقيقة برك، يدخل الأدمن ويجاوبك على كلش بالتفصيل.";
+    response.data?.choices?.[0]?.message?.content?.trim() ||
+    "اصبر دوك يجي الأدمن يكمل معاك.";
 
-  conversations[senderId].push({
-    role: "assistant",
-    content: reply,
-  });
+  // حفظ الرسالة والرد فقط بعد نجاح الطلب لمنع تكرار الرسائل عند إعادة المحاولة
+  conversations[senderId].push({ role: "user", content: message });
+  conversations[senderId].push({ role: "assistant", content: reply });
+
+  if (conversations[senderId].length > MAX_HISTORY) {
+    conversations[senderId] = conversations[senderId].slice(-MAX_HISTORY);
+  }
 
   return reply;
 }
@@ -405,21 +462,29 @@ async function askOpenRouter(senderId, message) {
 async function sendMessage(recipientId, text) {
   const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
 
-  const response = await axios.post(url, {
-    recipient: { id: recipientId },
-    message: { text: text },
-  });
+  try {
+    const response = await axios.post(
+      url,
+      {
+        recipient: { id: recipientId },
+        message: { text: text },
+      },
+      { timeout: 10000 }
+    );
 
-  const mid = response.data && response.data.message_id;
-  rememberBotMessage(mid);
+    const mid = response.data && response.data.message_id;
+    rememberBotMessage(mid);
+  } catch (err) {
+    console.error("خطأ في إرسال الرسالة لفيسبوك:", err.response?.data || err.message);
+  }
 }
 
 // ==== Self-ping لمنع نوم السيرفر فـ Render ====
-const SELF_URL = "https://facebook-messenger-bot-s8bp.onrender.com";
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || "https://facebook-messenger-bot-s8bp.onrender.com";
 
 setInterval(() => {
   axios
-    .get(SELF_URL)
+    .get(SELF_URL, { timeout: 10000 })
     .then(() => console.log("🔄 Self-ping OK"))
     .catch((err) => console.log("⚠️ Self-ping failed:", err.message));
 }, 14 * 60 * 1000);
