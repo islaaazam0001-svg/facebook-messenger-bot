@@ -47,6 +47,16 @@ function saveMutedUsers() {
   }
 }
 
+function muteCustomer(customerId, reason = "") {
+  adminMutedUsers.add(customerId);
+  saveMutedUsers();
+  if (userBuffers.has(customerId)) {
+    clearTimeout(userBuffers.get(customerId).timer);
+    userBuffers.delete(customerId);
+  }
+  console.log(`🔇 تم إسكات البوت للعميل (${customerId}) - السبب: ${reason}`);
+}
+
 function isBotPaused(customerId) {
   return adminMutedUsers.has(customerId);
 }
@@ -97,7 +107,7 @@ async function getUserName(senderId) {
       return res.data.first_name;
     }
   } catch (err) {
-    // تجاهل الخطأ في حال عدم توفر الصلاحية لجلب الاسم
+    // ignore
   }
   return null;
 }
@@ -151,14 +161,14 @@ async function sendFeedbackTemplate(recipientId, type = "snap") {
                   type: "web_url",
                   url: postUrl,
                   title: "اترك تقييمك هنا ⭐",
-                  webview_height_ratio: "full"
-                }
-              ]
-            }
-          ]
-        }
-      }
-    }
+                  webview_height_ratio: "full",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
   };
 
   try {
@@ -188,12 +198,12 @@ function handleUserMessageBuffered(senderId, text) {
   }
 
   userBuffer.timer = setTimeout(() => {
-    const combinedMessage = userBuffer.texts.join(" | ");
+    const combinedMessage = userBuffer.texts.join(" ");
     userBuffers.delete(senderId);
     if (!isBotPaused(senderId)) {
       handleMessageWithRetry(senderId, combinedMessage);
     }
-  }, 2500);
+  }, 4500);
 }
 
 function cleanMarkdown(text) {
@@ -208,29 +218,23 @@ function cleanMarkdown(text) {
     .trim();
 }
 
-// ==== التعليمات الصارمة للذكاء الاصطناعي ====
-const SYSTEM_PROMPT = `أنت مساعد آلي صارم ومباشر لمتجر "SIKI STORE" في الجزائر. تتحدث بالدارجة الجزائرية المحترمة والمحايدة، وتجيب باختصار شديد دون مقدمات أو ثرثرة.
+const SYSTEM_PROMPT = `أنت ممثل متجر "SIKI STORE" في الجزائر. أجب باختصار شديد وبالدارجة الجزائرية.
 
-الخدمات والأسعار المعتمدة في المتجر (حصرياً هذه الأربعة فقط):
-• سناب شات بلس (Snapchat Plus): 2700 دج (لمدة 12 شهر، للآيفون فقط، التفعيل في الحساب الشخصي للزبون).
-• كانفا برو (Canva Pro): 500 دج (لمدة 3 سنوات).
-• جيميناي برو (Gemini Advanced): 1000 دج (لمدة 18 شهر).
-• كابكات برو (CapCut Pro): شهر بـ 1000 دج | 6 أشهر بـ 3500 دج.
+الخدمات والأسعار المتاحة حصراً في المتجر (ممنوع منعاً باتاً ذكر أو بيع أي خدمة أخرى غير هذه الأربعة):
+1. سناب شات بلس: 2700 دج (12 شهر، للآيفون فقط، يتفعل في حساب الزبون الشخصي).
+2. كانفا برو: 500 دج (3 سنوات).
+3. جيميناي برو: 1000 دج (18 شهر).
+4. كابكات برو: شهر بـ 1000 دج | 6 أشهر بـ 3500 دج.
 
-طرق الدفع المتوفرة فقط:
-• باريدي موب (BaridiMob).
-• فليكسي (Flexy) مع زيادة 20% على السعر الأصلي.
-
-قواعد صارمة جداً (ممنوع مخالفتها تحت أي ظرف):
-1. عند السؤال عن الأسعار (مثل: شحال، Prix، الأسعار): اذكر قائمة الأسعار مباشرة وبدقة. **ممنوع منعاً باتاً** كتابة جملة "اصبر دوك يجي الأدمن يكمل معاك" عند عرض الأسعار أو الإجابة عن استفسار عادي.
-2. جملة "اصبر دوك يجي الأدمن يكمل معاك" تُكتب **فقط وحصرياً** في الحالات التالية:
-   - إذا قال الزبون أنه يريد الشراء الآن أو طلب رقم الحساب للدفع (RIP / رقم الهاتف).
-   - إذا أرسل الزبون إيميل أو معلومات حسابه لتفعيل الخدمة.
-3. إذا سأل الزبون عن أي خدمة أخرى غير الخدمات الأربع المذكورة أعلاه (مثل: ChatGPT, Netflix, IPTV, Spotify, سناب للأندرويد...): أجب بهذه الجملة فقط دون أي إضافة: "ما عندناش هذي الخدمة."
-4. ممنوع اختراع أسعار أو تخفيضات أو مدد اشتراك غير مذكورة أعلاه.
-5. ممنوع طلب الإيميل أو كلمة السر من الزبون.
-6. ممنوع تماماً استخدام ألقاب مثل (خويا، أختي، صاحبي، خو، حنون). خاطب الزبون بصيغة محايدة دائماً.
-7. ممنوع ذكر CCP أو البطاقة الذهبية أو Visa أو PayPal.`;
+قواعد صارمة جداً:
+- عندما يطلب الزبون الأسعار أو يسأل عن خدمة متوفرة: اعطه السعر والتفاصيل مباشرة وبكل بساطة. ممنوع تماماً إضافة جملة "اصبر دوك يجي الأدمن يكمل معاك" عند مجرد السؤال أو الاستفسار.
+- أضف جملة "اصبر دوك يجي الأدمن يكمل معاك" فقط إذا قال الزبون صراحة أنه يريد الشراء والدفع الآن (مثلاً: عطيني بريدي موب، كيفاش نخلص، راني حاب نشري درك) أو إذا كانت لديه مشكلة تقنية معقدة في حسابه.
+- إذا سأل الزبون عن خدمة أخرى غير موجودة في القائمة أعلاه: قل له باختصار: "ما عندناش هذي الخدمة، متوفر عندنا غير سناب بلس، كانفا، جيميناي وكابكات."
+- إذا أرسل الزبون تحية أو كلمات قصيرة أو غير واضحة: رد عليه بلطف واسأله واش من خدمة راه يحوس عليها من خدمات المتجر.
+- ممنوع اختراع الأسعار نهائياً.
+- ممنوع طلب كلمات السر أو إيميل الحساب من الزبون.
+- ممنوع استخدام الألقاب (لا خويا ولا أختي). تحدث بصيغة محايدة تماماً.
+- طرق الدفع: باريدي موب أو فليكسي (زائد 20%). ممنوع ذكر CCP أو فيزا.`;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -265,7 +269,7 @@ app.post("/webhook", async (req, res) => {
       if (!entry.messaging || !Array.isArray(entry.messaging)) continue;
 
       for (const webhookEvent of entry.messaging) {
-        // 1. معالجة رسائل الصفحة (Echo) لمعرفة تدخل الأدمن
+        // 1. رسائل الصفحة (Echo)
         if (webhookEvent.message && webhookEvent.message.is_echo) {
           const mid = webhookEvent.message.mid;
           const customerId = webhookEvent.recipient ? webhookEvent.recipient.id : null;
@@ -277,13 +281,7 @@ app.post("/webhook", async (req, res) => {
           if (wasSentByBot(mid)) {
             botSentMids.delete(mid);
           } else {
-            // إلغاء أي رد مؤقت قيد الانتظار لهذا الزبون فوراً
-            if (userBuffers.has(customerId)) {
-              clearTimeout(userBuffers.get(customerId).timer);
-              userBuffers.delete(customerId);
-            }
-
-            // السماح للأدمن بإعادة تشغيل البوت للزبون إذا كتب #بوت أو #bot
+            // أمر خاص للأدمن لإعادة تشغيل البوت للزبون إذا لزم الأمر
             if (adminText.toLowerCase() === "#bot" || adminText === "#بوت") {
               adminMutedUsers.delete(customerId);
               saveMutedUsers();
@@ -291,9 +289,7 @@ app.post("/webhook", async (req, res) => {
               continue;
             }
 
-            adminMutedUsers.add(customerId);
-            saveMutedUsers();
-            console.log("🛑 الأدمن رد يدوياً. تم إيقاف البوت للعميل:", customerId);
+            muteCustomer(customerId, "تدخل الأدمن يدوياً");
 
             if (adminText === "✅✅") {
               await sendFeedbackTemplate(customerId, "creator");
@@ -307,34 +303,54 @@ app.post("/webhook", async (req, res) => {
           continue;
         }
 
-        // 2. معالجة رسائل الزبون الواردة
         const senderId = webhookEvent.sender ? webhookEvent.sender.id : null;
 
+        // 2. معالجة أزرار الإعلانات (مثل: طلب الاشتراك)
+        if (senderId && webhookEvent.postback) {
+          if (isBotPaused(senderId)) continue;
+          const postbackTitle = webhookEvent.postback.title || "سلام، حاب نشترك، شحال الأسعار؟";
+          handleUserMessageBuffered(senderId, postbackTitle);
+          continue;
+        }
+
+        // 3. معالجة رسائل الزبون
         if (senderId && webhookEvent.message && !webhookEvent.message.is_echo) {
           if (isBotPaused(senderId)) {
-            console.log("🔇 البوت متوقف على العميل لتكفل الأدمن به:", senderId);
+            console.log("🔇 البوت متوقف على العميل:", senderId);
             continue;
           }
 
           const incomingMid = webhookEvent.message.mid;
           if (alreadyProcessed(incomingMid)) {
-            console.log("♻️ رسالة مكررة، تم تجاهلها:", incomingMid);
             continue;
           }
 
-          // في حال إرسال صورة (وصل دفع غالباً)
-          if (
-            webhookEvent.message.attachments &&
-            webhookEvent.message.attachments.some((a) => a.type === "image")
-          ) {
-            await sendMessage(
-              senderId,
-              "يعطيك الصحة، اصبر دوك يجي الأدمن يفيريفي الوصل ويكمل معاك التفعيل."
+          // التفريق بين اللايك/الملصقات وبين صور الوصل الحقيقية
+          if (webhookEvent.message.attachments) {
+            const isSticker = webhookEvent.message.attachments.some(
+              (a) => a.payload && a.payload.sticker_id
             );
-            continue;
+
+            if (isSticker) {
+              handleUserMessageBuffered(senderId, "سلام، شحال الأسعار؟");
+              continue;
+            }
+
+            const isRealImage = webhookEvent.message.attachments.some(
+              (a) => a.type === "image" && (!a.payload || !a.payload.sticker_id)
+            );
+
+            if (isRealImage) {
+              await sendMessage(
+                senderId,
+                "يعطيك الصحة، اصبر شوية يدخل مسؤول الصفحة يفيريفي الوصل ويفعل لك فوراً."
+              );
+              // إسكات البوت فوراً بعد استلام صورة الوصل حتى لا يزعج الزبون
+              muteCustomer(senderId, "أرسل صورة وصل");
+              continue;
+            }
           }
 
-          // في حال إرسال نص
           if (webhookEvent.message.text) {
             const userMessage = webhookEvent.message.text.trim();
             if (userMessage) {
@@ -361,7 +377,7 @@ async function sendTypingIndicator(recipientId) {
       { timeout: 5000 }
     );
   } catch (err) {
-    // تجاهل الخطأ
+    // ignore
   }
 }
 
@@ -382,6 +398,11 @@ async function handleMessageWithRetry(senderId, userMessage) {
 
       if (!isBotPaused(senderId) && cleanReply) {
         await sendMessage(senderId, cleanReply);
+
+        // 🔥 الحل السحري: إذا قال البوت للزبون "اصبر دوك يجي الأدمن"، يسكت البوت فوراً ولا يكررها أبداً!
+        if (/يجي الأدمن|يدخل الأدمن|مسؤول الصفحة/.test(cleanReply)) {
+          muteCustomer(senderId, "تم تحويل الزبون للأدمن");
+        }
       }
       return;
     } catch (err) {
@@ -416,19 +437,19 @@ async function askOpenRouter(senderId, message) {
 
   const customerName = await getUserName(senderId);
   const promptWithContext = customerName
-    ? `${SYSTEM_PROMPT}\n\nملاحظة: اسم الزبون هو "${customerName}" (لا تستخدم ألقاب مثل خويا أو أختي).`
+    ? `${SYSTEM_PROMPT}\n\nاسم الزبون: "${customerName}".`
     : SYSTEM_PROMPT;
 
   const historyToSend = [
     ...conversations[senderId],
-    { role: "user", content: message }
+    { role: "user", content: message },
   ].slice(-MAX_HISTORY);
 
   const response = await axios.post(
     url,
     {
       model: "google/gemini-2.5-flash",
-      temperature: 0.0,
+      temperature: 0.2,
       messages: [
         { role: "system", content: promptWithContext },
         ...historyToSend,
@@ -437,7 +458,7 @@ async function askOpenRouter(senderId, message) {
     },
     {
       headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        Authorization: "Bearer " + OPENROUTER_API_KEY,
         "Content-Type": "application/json",
       },
       timeout: 15000,
@@ -448,7 +469,6 @@ async function askOpenRouter(senderId, message) {
     response.data?.choices?.[0]?.message?.content?.trim() ||
     "اصبر دوك يجي الأدمن يكمل معاك.";
 
-  // حفظ الرسالة والرد فقط بعد نجاح الطلب لمنع تكرار الرسائل عند إعادة المحاولة
   conversations[senderId].push({ role: "user", content: message });
   conversations[senderId].push({ role: "assistant", content: reply });
 
